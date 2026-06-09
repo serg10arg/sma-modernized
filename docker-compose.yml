@@ -1,0 +1,21 @@
+version: "3.8"
+
+# ============================================================
+# Docker Compose raíz del sistema sma-modernized
+# Se irá completando a medida que se implementen los servicios
+# ============================================================
+
+services:
+
+  # --- Zipkin (trazabilidad distribuida) ---
+  zipkin:
+    image: openzipkin/zipkin:latest
+    container_name: zipkin
+    ports:
+      - "${ZIPKIN_PORT:-9411}:9411"
+    networks:
+      - sma-network
+
+networks:
+  sma-network:
+    driver: bridge
