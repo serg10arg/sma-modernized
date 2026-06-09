@@ -66,7 +66,7 @@ según tu entorno.
 | Etapa | Descripción | Estado |
 |---|---|---|
 | Paso 0 | Inicialización del repositorio | ✅ Completado |
-| Etapa 1 | config-server + eureka-server | ⏳ Pendiente |
+| Etapa 1 | config-server + eureka-server | ✅ Completado |
 | Etapa 2 | licensing-service (CRUD básico) | ⏳ Pendiente |
 | Etapa 3 | gateway-server | ⏳ Pendiente |
 | Etapa 4 | organization-service + comunicación entre servicios | ⏳ Pendiente |
