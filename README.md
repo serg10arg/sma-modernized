@@ -67,7 +67,7 @@ según tu entorno.
 |---|---|---|
 | Paso 0 | Inicialización del repositorio | ✅ Completado |
 | Etapa 1 | config-server + eureka-server | ✅ Completado |
-| Etapa 2 | licensing-service (CRUD básico) | ⏳ Pendiente |
+| Etapa 2 | licensing-service (CRUD básico) | ✅ Completado |
 | Etapa 3 | gateway-server | ⏳ Pendiente |
 | Etapa 4 | organization-service + comunicación entre servicios | ⏳ Pendiente |
 | Etapa 5 | Resilience4j (circuit breaker, retry, bulkhead) | ⏳ Pendiente |
