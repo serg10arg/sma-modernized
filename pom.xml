@@ -35,6 +35,11 @@
         <spring-boot.version>3.3.4</spring-boot.version>
         <spring-cloud.version>2023.0.3</spring-cloud.version>
         <resilience4j.version>2.2.0</resilience4j.version>
+
+        <!-- Lombok: se fija una versión compatible con el JDK 22 en uso.
+             La gestionada por Spring Boot 3.3.4 (1.18.34) falla al compilar
+             bajo JDK 22 con "TypeTag :: UNKNOWN". -->
+        <lombok.version>1.18.40</lombok.version>
     </properties>
 
     <!-- Gestión centralizada de dependencias para todos los módulos -->
@@ -57,6 +62,14 @@
                 <version>${spring-cloud.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+
+            <!-- Sobrescribe la versión de Lombok gestionada por el BOM de Spring Boot.
+                 Una declaración directa tiene prioridad sobre los BOM importados. -->
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
             </dependency>
 
         </dependencies>

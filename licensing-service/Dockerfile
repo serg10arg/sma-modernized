@@ -23,4 +23,9 @@ COPY --from=build /workspace/licensing-service/target/*.jar app.jar
 # Puerto que expone el servicio
 EXPOSE 8080
 
+# Healthcheck: verifica cada 10s que el endpoint de salud responde correctamente
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider \
+  http://localhost:8080/actuator/health || exit 1
+
 ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -1,19 +1,38 @@
 package com.sma.licensing.model;
 
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
+import org.springframework.hateoas.RepresentationModel;
+
 /**
- * Representa una licencia de software asignada a una organización.
- * Se usa Java record (Java 21) en lugar de Lombok para inmutabilidad nativa.
- *
- * @param licenseId      Identificador único de la licencia
- * @param organizationId Identificador de la organización propietaria
- * @param productName    Nombre del producto licenciado
- * @param licenseType    Tipo de licencia (por ejemplo: full, trial)
- * @param description    Descripción adicional de la licencia
+ * Modelo de dominio que representa una licencia de software.
+ * Extiende RepresentationModel para soportar links HATEOAS en las respuestas.
+ * Se convierte de record a clase para permitir la herencia requerida por HATEOAS.
  */
-public record License(
-        String licenseId,
-        String organizationId,
-        String productName,
-        String licenseType,
-        String description
-) {}
+@Getter
+@Setter
+@ToString
+public class License extends RepresentationModel<License> {
+
+    // Identificador interno de la licencia
+    private int id;
+
+    // Identificador único de negocio de la licencia
+    private String licenseId;
+
+    // Descripción de la licencia
+    private String description;
+
+    // Identificador de la organización propietaria
+    private String organizationId;
+
+    // Nombre del producto al que pertenece esta licencia
+    private String productName;
+
+    // Tipo de licencia (full, trial, etc.)
+    private String licenseType;
+
+    // Comentario adicional inyectado desde configuración externa (etapas futuras)
+    private String comment;
+}
