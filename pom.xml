@@ -22,6 +22,7 @@
     <modules>
         <module>config-server</module>
         <module>eureka-server</module>
+        <module>licensing-service</module>
     </modules>
 
     <properties>
@@ -74,8 +75,9 @@
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>3.13.0</version>
                     <configuration>
-                        <source>${java.version}</source>
-                        <target>${java.version}</target>
+                        <release>${java.version}</release>
+                        <!-- Necesario para que Spring MVC resuelva @PathVariable/@RequestParam por reflexión -->
+                        <parameters>true</parameters>
                     </configuration>
                 </plugin>
             </plugins>

@@ -51,6 +51,17 @@ services:
     networks:
       - sma-network
 
+  # --- Licensing Service ---
+  licensing-service:
+    build:
+      context: .
+      dockerfile: licensing-service/Dockerfile
+    container_name: licensing-service
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=default
+
 networks:
   sma-network:
     driver: bridge
