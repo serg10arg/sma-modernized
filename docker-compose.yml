@@ -14,6 +14,27 @@ services:
     networks:
       - sma-network
 
+  # --- PostgreSQL (persistencia del licensing-service) ---
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-sma_licensing}
+      POSTGRES_USER: ${DB_USER:-sma_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-sma_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - sma-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-sma_user} -d ${DB_NAME:-sma_licensing}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   # --- Config Server ---
   config-server:
     build:
@@ -59,12 +80,25 @@ services:
       - "8080:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=default
+      - CONFIG_SERVER_URI=http://config-server:8888
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=${DB_NAME:-sma_licensing}
+      - DB_USER=${DB_USER:-sma_user}
+      - DB_PASSWORD=${DB_PASSWORD:-sma_password}
     depends_on:
       config-server:
         condition: service_healthy
       eureka-server:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - sma-network
 
 networks:
   sma-network:
     driver: bridge
+
+volumes:
+  postgres-data:

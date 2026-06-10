@@ -2,9 +2,29 @@ server:
   port: 8080
 
 spring:
-  application:
-    name: licensing-service
+  # Conexión a PostgreSQL. Las credenciales se resuelven desde variables de
+  # entorno en el contenedor del licensing-service (no en el config-server).
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:sma_licensing}
+    username: ${DB_USER:sma_user}
+    password: ${DB_PASSWORD:sma_password}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      # No se generan tablas automáticamente; el esquema lo crea schema.sql
+      ddl-auto: none
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  sql:
+    init:
+      # Ejecuta schema.sql y data.sql al arrancar
+      mode: always
 
+# Configuración de Eureka preparada para la Etapa 4 (aún sin efecto:
+# el licensing-service todavía no incluye la dependencia eureka-client)
 eureka:
   client:
     service-url:
@@ -17,3 +37,6 @@ management:
     web:
       exposure:
         include: health,info
+  endpoint:
+    health:
+      show-details: always

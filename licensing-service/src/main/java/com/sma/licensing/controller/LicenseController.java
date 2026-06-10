@@ -5,6 +5,7 @@ import com.sma.licensing.service.LicenseService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Locale;
 
 import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.linkTo;
@@ -13,8 +14,7 @@ import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
 /**
  * Controlador REST del servicio de licencias.
  * Expone endpoints CRUD bajo /v1/organization/{organizationId}/license.
- * Incluye soporte para internacionalización (header Accept-Language)
- * y links HATEOAS en las respuestas.
+ * Incluye internacionalización (header Accept-Language) y links HATEOAS.
  */
 @RestController
 @RequestMapping("/v1/organization/{organizationId}/license")
@@ -27,13 +27,7 @@ public class LicenseController {
     }
 
     /**
-     * Obtiene una licencia específica de una organización.
-     * Añade links HATEOAS para todas las operaciones relacionadas.
-     *
-     * @param organizationId Identificador de la organización
-     * @param licenseId      Identificador de la licencia
-     * @param locale         Idioma del cliente (resuelto desde Accept-Language)
-     * @return Licencia con links hipermedia y HTTP 200
+     * Obtiene una licencia específica de una organización, con links HATEOAS.
      */
     @GetMapping("/{licenseId}")
     public ResponseEntity<License> getLicense(
@@ -43,7 +37,6 @@ public class LicenseController {
 
         License license = licenseService.getLicense(licenseId, organizationId, locale);
 
-        // Añade links HATEOAS apuntando a cada operación del controller
         license.add(
                 linkTo(methodOn(LicenseController.class)
                         .getLicense(organizationId, licenseId, locale))
@@ -63,12 +56,15 @@ public class LicenseController {
     }
 
     /**
+     * Lista todas las licencias de una organización.
+     */
+    @GetMapping
+    public ResponseEntity<List<License>> getLicenses(@PathVariable String organizationId) {
+        return ResponseEntity.ok(licenseService.getLicensesByOrganization(organizationId));
+    }
+
+    /**
      * Crea una nueva licencia para una organización.
-     *
-     * @param organizationId Identificador de la organización
-     * @param license        Datos de la licencia en el body del request
-     * @param locale         Idioma del cliente
-     * @return Mensaje de confirmación localizado y HTTP 200
      */
     @PostMapping
     public ResponseEntity<String> createLicense(
@@ -82,11 +78,6 @@ public class LicenseController {
 
     /**
      * Actualiza una licencia existente de una organización.
-     *
-     * @param organizationId Identificador de la organización
-     * @param license        Datos actualizados en el body del request
-     * @param locale         Idioma del cliente
-     * @return Mensaje de confirmación localizado y HTTP 200
      */
     @PutMapping
     public ResponseEntity<String> updateLicense(
@@ -100,11 +91,6 @@ public class LicenseController {
 
     /**
      * Elimina una licencia de una organización.
-     *
-     * @param organizationId Identificador de la organización
-     * @param licenseId      Identificador de la licencia a eliminar
-     * @param locale         Idioma del cliente
-     * @return Mensaje de confirmación localizado y HTTP 200
      */
     @DeleteMapping("/{licenseId}")
     public ResponseEntity<String> deleteLicense(

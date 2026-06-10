@@ -1,18 +1,8 @@
 spring:
   application:
-    # Nombre del servicio; se usará para el registro en Eureka y Config Server
+    # Nombre del servicio; determina qué archivo de config solicita al config-server
     name: licensing-service
-
-server:
-  # Puerto en el que escucha el servicio
-  port: 8080
-
-# Configuración de Actuator: expone los endpoints de salud y métricas
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics
-  endpoint:
-    health:
-      show-details: always
+  config:
+    # Importa la configuración del config-server al arrancar.
+    # En Docker se sobreescribe CONFIG_SERVER_URI; en local usa el valor por defecto.
+    import: "configserver:${CONFIG_SERVER_URI:http://localhost:8888}"
