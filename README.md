@@ -106,7 +106,7 @@ Cópialo desde `.env.example` y ajusta los valores según tu entorno.
 | Paso 0 | Inicialización del monorepo | ✅ Completada |
 | Etapa 1 | `config-server` + `eureka-server` | ✅ Completada |
 | Etapa 2 | `licensing-service`: esqueleto REST + i18n + HATEOAS + healthcheck | ✅ Completada |
-| Etapa 2b | Docker: Dockerfiles y docker-compose completo con healthchecks | 🔜 Pendiente |
+| Etapa 2b | Docker: Dockerfiles y docker-compose completo con healthchecks | ✅ Completada |
 | Etapa 3 | Config Server con Git + PostgreSQL + Spring Data JPA en licensing | 🔜 Pendiente |
 | Etapa 4 | `organization-service` + comunicación entre servicios + correlationId | 🔜 Pendiente |
 | Etapa 5 | Resilience4j: circuit breaker, retry, bulkhead, rate limiter, fallback | 🔜 Pendiente |

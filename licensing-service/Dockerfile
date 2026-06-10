@@ -4,6 +4,11 @@ WORKDIR /workspace
 
 # Copia el parent pom para resolver dependencias del monorepo
 COPY pom.xml .
+# Los pom de los módulos hermanos son necesarios para que el reactor de Maven
+# resuelva el agregador (el parent los declara en <modules>). No se compilan:
+# con -pl licensing-service -am solo se construye este servicio y el parent.
+COPY config-server/pom.xml config-server/
+COPY eureka-server/pom.xml eureka-server/
 COPY licensing-service/pom.xml licensing-service/
 
 # Descarga dependencias antes de copiar el código fuente (caché de capas)

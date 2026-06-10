@@ -2,5 +2,7 @@ spring:
   application:
     name: eureka-server
   config:
-    # Obtiene la configuración completa desde el config-server al arrancar
-    import: "configserver:http://localhost:8888"
+    # Obtiene la configuración completa desde el config-server al arrancar.
+    # El host es configurable por entorno (CONFIG_SERVER_URL); por defecto localhost
+    # para desarrollo local. En Docker se inyecta http://config-server:8888.
+    import: "configserver:${CONFIG_SERVER_URL:http://localhost:8888}"

@@ -1,8 +1,6 @@
-version: "3.8"
-
 # ============================================================
 # Docker Compose raíz del sistema sma-modernized
-# Etapa 1: config-server + eureka-server + zipkin
+# Etapa 2b: config-server + eureka-server + licensing-service + zipkin
 # ============================================================
 
 services:
@@ -43,8 +41,8 @@ services:
     ports:
       - "${EUREKA_SERVER_PORT:-8761}:8761"
     environment:
-      # Apunta al config-server dentro de la red Docker
-      - SPRING_CONFIG_IMPORT=configserver:http://config-server:8888
+      # Apunta al config-server dentro de la red Docker (resuelto en application.yml)
+      - CONFIG_SERVER_URL=http://config-server:8888
     depends_on:
       config-server:
         condition: service_healthy
@@ -61,6 +59,11 @@ services:
       - "8080:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=default
+    depends_on:
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
 
 networks:
   sma-network:
