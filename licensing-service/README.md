@@ -4,27 +4,29 @@
 
 Microservicio de gestión de licencias de software del sistema sma-modernized.
 Expone una API REST para consultar, crear, actualizar y eliminar licencias
-asociadas a organizaciones. En esta etapa los datos se sirven en memoria, sin
-dependencias de infraestructura externa. Las respuestas incluyen links
-hipermedia (HATEOAS) y los mensajes se adaptan al idioma del cliente.
+asociadas a organizaciones. Persiste los datos en PostgreSQL mediante Spring
+Data JPA y obtiene su configuración del servidor de configuración centralizada.
+Las respuestas incluyen links hipermedia (HATEOAS) y los mensajes se adaptan al
+idioma del cliente.
 
 ## Etapa
 
-Introducido en la **Etapa 2** como esqueleto REST básico y completado en la
-misma etapa con internacionalización, Spring HATEOAS y un Dockerfile con
-healthcheck.
+Introducido en la **Etapa 2** como esqueleto REST básico, completado en la misma
+etapa con internacionalización, Spring HATEOAS y un Dockerfile con healthcheck.
+En la **Etapa 3** se incorporó la persistencia en PostgreSQL con Spring Data JPA
+y la integración con el servidor de configuración centralizada.
 
-Las etapas posteriores añadirán persistencia con PostgreSQL, integración con
-Config Server, registro en Eureka, comunicación con el organization-service y
-seguridad OAuth2.
+Las etapas posteriores añadirán el registro en Eureka, la comunicación con el
+organization-service y la seguridad OAuth2.
 
 ## Responsabilidades
 
 - Exponer los endpoints REST CRUD de licencias por organización
+- Persistir las licencias en PostgreSQL mediante Spring Data JPA
 - Devolver la representación JSON de una licencia con links hipermedia (HATEOAS)
 - Adaptar los mensajes de respuesta al idioma del cliente (header `Accept-Language`)
+- Obtener su configuración del config-server al arrancar
 - Publicar el endpoint de salud `/actuator/health` para verificación operacional
-- Actuar como módulo Maven independiente dentro del monorepo `sma-modernized`
 
 ## Tecnologías
 
@@ -33,114 +35,147 @@ seguridad OAuth2.
 | Java | 21 | Lenguaje principal |
 | Spring Boot | 3.3.x | Framework base del microservicio |
 | Spring Web (Tomcat) | 3.3.x | Servidor HTTP embebido y capa REST |
+| Spring Data JPA | 3.3.x | Acceso a datos y mapeo objeto-relacional |
+| Spring Cloud Config Client | 4.x | Lectura de configuración centralizada |
 | Spring HATEOAS | 3.3.x | Links hipermedia en las respuestas REST |
 | Spring Boot Actuator | 3.3.x | Endpoints de salud y métricas |
+| PostgreSQL | 16 | Base de datos relacional |
 | Lombok | - | Reducción de boilerplate en el modelo |
 | Maven | 3.9.x | Herramienta de construcción |
 | Docker | - | Contenerización del servicio |
 
 ## Configuración
 
-El servicio se configura mediante `src/main/resources/application.yml`.
+El servicio mantiene en su `application.yml` local únicamente el nombre del
+servicio y la importación de la configuración remota. El resto de la
+configuración (puerto, datasource, JPA) se sirve desde el config-server, en el
+archivo `config/licensing-service.yml`.
 
-| Propiedad | Valor por defecto | Descripción |
+### Configuración local (`application.yml`)
+
+| Propiedad | Valor | Descripción |
 |---|---|---|
-| `spring.application.name` | `licensing-service` | Nombre del servicio; usado por Eureka y Config Server en etapas futuras |
-| `server.port` | `8080` | Puerto en el que escucha el servidor HTTP |
-| `management.endpoints.web.exposure.include` | `health,info,metrics` | Endpoints de Actuator expuestos |
-| `management.endpoint.health.show-details` | `always` | Nivel de detalle del endpoint de salud |
+| `spring.application.name` | `licensing-service` | Determina qué archivo de configuración solicita al config-server |
+| `spring.config.import` | `configserver:${CONFIG_SERVER_URI:http://localhost:8888}` | URI del config-server; sobreescribible por variable de entorno |
+
+### Configuración centralizada (servida por el config-server)
+
+| Propiedad | Valor | Descripción |
+|---|---|---|
+| `server.port` | `8080` | Puerto del servidor HTTP |
+| `spring.datasource.url` | `jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}` | URL de conexión a PostgreSQL |
+| `spring.jpa.hibernate.ddl-auto` | `none` | El esquema lo gestiona `schema.sql`, no Hibernate |
+| `spring.sql.init.mode` | `always` | Ejecuta `schema.sql` y `data.sql` al arrancar |
+
+### Variables de entorno
+
+| Variable | Por defecto | Descripción |
+|---|---|---|
+| `CONFIG_SERVER_URI` | `http://localhost:8888` | URI del servidor de configuración |
+| `DB_HOST` | `localhost` | Host de PostgreSQL |
+| `DB_PORT` | `5432` | Puerto de PostgreSQL |
+| `DB_NAME` | `sma_licensing` | Nombre de la base de datos |
+| `DB_USER` | `sma_user` | Usuario de la base de datos |
+| `DB_PASSWORD` | `sma_password` | Contraseña de la base de datos |
 
 ### Internacionalización
 
-Los mensajes se externalizan en archivos de propiedades dentro de
-`src/main/resources`:
+Los mensajes se externalizan en `src/main/resources`:
 
-- `messages.properties` — mensajes en inglés (idioma por defecto)
-- `messages_es.properties` — mensajes en español
+- `messages.properties` — inglés (idioma por defecto)
+- `messages_es.properties` — español
 
-El idioma se selecciona automáticamente según el header `Accept-Language` de la
-petición. Spring Boot resuelve el `Locale` y lo inyecta en los métodos del
-controller.
+Usan placeholders nativos de `MessageSource` (`{0}`, `{1}`). El idioma se
+selecciona automáticamente según el header `Accept-Language`.
 
 ## Ejecución local
 
-**Con Maven (desde la raíz del monorepo):**
-
-```bash
-# Compilar solo este módulo y sus dependencias del monorepo
-mvn clean package -pl licensing-service -am -DskipTests
-
-# Arrancar el servicio
-mvn spring-boot:run -pl licensing-service
-```
-
-**Con Docker (desde la raíz del monorepo):**
-
-```bash
-# Construir la imagen (build multi-etapa)
-docker build -f licensing-service/Dockerfile -t licensing-service:local .
-
-# Arrancar el contenedor
-docker run -p 8080:8080 licensing-service:local
-```
+El servicio requiere que el config-server y una instancia de PostgreSQL estén
+disponibles. La forma más sencilla es levantar todo con Docker Compose.
 
 **Con Docker Compose (desde la raíz del monorepo):**
 
 ```bash
-docker compose up licensing-service
+docker compose up --build licensing-service
+```
+
+**Solo el servicio con Maven (requiere config-server y PostgreSQL ya activos):**
+
+```bash
+mvn clean package -pl licensing-service -am -DskipTests
+mvn spring-boot:run -pl licensing-service
 ```
 
 ## API
 
-Todos los endpoints aceptan el header `Accept-Language` (`en` o `es`) para
-seleccionar el idioma de los mensajes de respuesta.
+Todos los endpoints aceptan el header `Accept-Language` (`en` o `es`).
 
 ### GET /v1/organization/{organizationId}/license/{licenseId}
 
-Obtiene una licencia específica de una organización, con links HATEOAS.
+Obtiene una licencia específica, con links HATEOAS. Devuelve HTTP 404 si no existe.
 
-**Ejemplo de request:**
+**Request:**
 
 ```
 GET /v1/organization/org-001/license/lic-001
 Accept-Language: es
 ```
 
-**Ejemplo de response (HTTP 200):**
+**Response (HTTP 200):**
 
 ```json
 {
-  "id": 0,
   "licenseId": "lic-001",
-  "description": "Software product",
   "organizationId": "org-001",
+  "description": "Licencia de prueba",
   "productName": "O-stock",
   "licenseType": "full",
-  "comment": "No se puede encontrar la licencia con id lic-001 para la organización org-001",
+  "comment": "Registro de ejemplo",
   "_links": {
-    "self": {
-      "href": "http://localhost:8080/v1/organization/org-001/license/lic-001"
-    },
-    "createLicense": {
-      "href": "http://localhost:8080/v1/organization/org-001/license"
-    },
-    "updateLicense": {
-      "href": "http://localhost:8080/v1/organization/org-001/license"
-    },
-    "deleteLicense": {
-      "href": "http://localhost:8080/v1/organization/org-001/license/lic-001"
-    }
+    "self": { "href": "http://localhost:8080/v1/organization/org-001/license/lic-001" },
+    "createLicense": { "href": "http://localhost:8080/v1/organization/org-001/license" },
+    "updateLicense": { "href": "http://localhost:8080/v1/organization/org-001/license" },
+    "deleteLicense": { "href": "http://localhost:8080/v1/organization/org-001/license/lic-001" }
   }
 }
+```
+
+**Response (HTTP 404):**
+
+```json
+{
+  "error": "No se puede encontrar la licencia con id NO-EXISTE para la organización org-001"
+}
+```
+
+---
+
+### GET /v1/organization/{organizationId}/license
+
+Lista todas las licencias de una organización.
+
+**Response (HTTP 200):**
+
+```json
+[
+  {
+    "licenseId": "lic-001",
+    "organizationId": "org-001",
+    "description": "Licencia de prueba",
+    "productName": "O-stock",
+    "licenseType": "full",
+    "comment": "Registro de ejemplo"
+  }
+]
 ```
 
 ---
 
 ### POST /v1/organization/{organizationId}/license
 
-Crea una nueva licencia para una organización. Asigna un `licenseId` aleatorio.
+Crea una nueva licencia. Asigna un `licenseId` aleatorio y la persiste.
 
-**Ejemplo de request:**
+**Request:**
 
 ```
 POST /v1/organization/org-001/license
@@ -148,25 +183,25 @@ Accept-Language: es
 Content-Type: application/json
 
 {
-  "description": "Software product",
+  "description": "Licencia de produccion",
   "productName": "O-stock",
   "licenseType": "full"
 }
 ```
 
-**Ejemplo de response (HTTP 200):**
+**Response (HTTP 200):**
 
 ```
-Licencia creada License(id=0, licenseId=..., description=Software product, organizationId=org-001, productName=O-stock, licenseType=full, comment=null)
+Licencia creada License(licenseId=..., organizationId=org-001, ...)
 ```
 
 ---
 
 ### PUT /v1/organization/{organizationId}/license
 
-Actualiza una licencia existente de una organización.
+Actualiza una licencia existente.
 
-**Ejemplo de request:**
+**Request:**
 
 ```
 PUT /v1/organization/org-001/license
@@ -175,13 +210,13 @@ Content-Type: application/json
 
 {
   "licenseId": "lic-001",
-  "description": "Software product",
+  "description": "Descripción actualizada",
   "productName": "O-stock",
   "licenseType": "full"
 }
 ```
 
-**Ejemplo de response (HTTP 200):**
+**Response (HTTP 200):**
 
 ```
 Licencia actualizada License(...)
@@ -191,16 +226,9 @@ Licencia actualizada License(...)
 
 ### DELETE /v1/organization/{organizationId}/license/{licenseId}
 
-Elimina una licencia de una organización.
+Elimina una licencia. Devuelve HTTP 404 si no existe.
 
-**Ejemplo de request:**
-
-```
-DELETE /v1/organization/org-001/license/lic-001
-Accept-Language: es
-```
-
-**Ejemplo de response (HTTP 200):**
+**Response (HTTP 200):**
 
 ```
 Licencia eliminada lic-001
@@ -210,38 +238,35 @@ Licencia eliminada lic-001
 
 ### GET /actuator/health
 
-Verifica el estado operacional del servicio. Usado por el healthcheck del
-contenedor Docker.
-
-**Response:**
+Verifica el estado operacional del servicio. Usado por el healthcheck del contenedor.
 
 ```json
-{
-  "status": "UP"
-}
+{ "status": "UP" }
 ```
 
 ## Decisiones técnicas
 
 | Decisión tomada | Alternativas consideradas | Motivo de la elección |
 |---|---|---|
-| `License` como clase con Lombok | Mantener Java record | Spring HATEOAS requiere extender `RepresentationModel<License>`, lo cual exige herencia; los records no pueden extender clases |
-| Internacionalización con `MessageSource` | Mensajes hardcodeados, librería externa | Es el mecanismo nativo de Spring; resuelve el `Locale` automáticamente desde `Accept-Language` |
-| HATEOAS vía `WebMvcLinkBuilder` | Construcción manual de URLs, omitir HATEOAS | Genera los links a partir de los métodos del controller, evitando URLs hardcodeadas que se rompen al cambiar rutas |
-| Dockerfile multi-etapa con healthcheck | Imagen única, sin healthcheck | El build multi-etapa reduce el tamaño de la imagen final; el healthcheck permite a Docker Compose esperar a que el servicio esté `healthy` |
-| Datos en memoria | PostgreSQL desde el inicio | Mantiene el servicio autónomo en esta etapa; la persistencia se introduce en una etapa posterior |
+| PostgreSQL 16 | MySQL, H2 en memoria | Base de datos robusta estándar; con volumen persistente sobrevive a reinicios, a diferencia de H2 |
+| Spring Data JPA | JDBC plano, MyBatis | Reduce boilerplate; integración nativa con Spring Boot |
+| `licenseId` (String) como clave primaria | Campo `id` numérico autogenerado | El identificador de negocio es único y significativo; evita una clave artificial redundante |
+| `ddl-auto: none` + `schema.sql` | `ddl-auto: update` de Hibernate | Control explícito del esquema; `update` no es seguro ni predecible para entornos reales |
+| `spring.config.import` | `bootstrap.yml` | El `bootstrap.yml` está obsoleto en Spring Boot 3.x; `spring.config.import` es el mecanismo actual |
+| `MessageSource` con placeholders `{0}` | `String.format` con `%s` | Es el mecanismo nativo de Spring para i18n; evita el doble procesamiento de cadenas |
+| Una sola clase `License` (entidad + HATEOAS) | DTO separado de la entidad | Mantiene la etapa simple; la separación en DTO queda como posible refactor futuro |
 
 ## Dependencias con otros servicios
 
-En esta etapa el servicio opera de forma completamente autónoma, sin dependencias
-de otros servicios del sistema.
+| Servicio | Estado | Motivo |
+|---|---|---|
+| `config-server` | Activo | Provee la configuración del servicio al arrancar |
+| PostgreSQL | Activo | Almacena las licencias |
 
-Las siguientes dependencias se incorporarán en etapas futuras:
+Las siguientes se incorporarán en etapas futuras:
 
 | Servicio | Etapa | Motivo |
 |---|---|---|
-| `config-server` | Etapa 3 | Externalización de la configuración |
-| PostgreSQL | Etapa 3 | Persistencia de las licencias |
 | `eureka-server` | Etapa 4 | Registro y descubrimiento de servicio |
 | `organization-service` | Etapa 4 | Resolución del nombre de la organización por ID |
 | `gateway-server` | Etapa 6 | Enrutamiento centralizado de peticiones |

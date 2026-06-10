@@ -22,6 +22,8 @@ tecnológico moderno de Spring.
 | Spring Cloud Netflix Eureka | 4.x | Registro y descubrimiento de servicios |
 | Spring Cloud Gateway | 4.x | Enrutamiento centralizado (API Gateway) |
 | Spring Cloud LoadBalancer | 4.x | Balanceo de carga del lado cliente |
+| Spring Data JPA | 3.3.x | Acceso a datos y mapeo objeto-relacional |
+| PostgreSQL | 16 | Base de datos relacional |
 | Resilience4j | 2.x | Patrones de resiliencia (circuit breaker, retry, etc.) |
 | Spring Security 6 + OAuth2 | 6.x | Autenticación y autorización |
 | Spring Cloud Stream + Kafka | 4.x | Mensajería asíncrona |
@@ -33,16 +35,16 @@ tecnológico moderno de Spring.
 
 ![Arquitectura del sistema](docs/images/system.png)
 
-
 ## Servicios
 
 | Servicio | Descripción | Puerto |
 |---|---|---|
-| `config-server` | Configuración centralizada (Spring Cloud Config) | 8071 |
+| `config-server` | Configuración centralizada (Spring Cloud Config) | 8888 |
 | `eureka-server` | Registro y descubrimiento de servicios | 8761 |
 | `gateway-server` | API Gateway y enrutamiento | 8072 |
 | `licensing-service` | Gestión de licencias de software | 8080 |
 | `organization-service` | Gestión de organizaciones | 8081 |
+| `postgres` | Base de datos relacional | 5432 |
 | `zipkin` | Trazabilidad distribuida | 9411 |
 
 ## Ejecución del sistema completo
@@ -91,13 +93,14 @@ Cópialo desde `.env.example` y ajusta los valores según tu entorno.
 | Variable | Descripción | Valor de ejemplo |
 |---|---|---|
 | `SPRING_PROFILES_ACTIVE` | Perfil de Spring activo en todos los servicios | `default` |
-| `CONFIG_SERVER_URI` | URL del config-server para los servicios cliente | `http://config-server:8071` |
+| `CONFIG_SERVER_URI` | URL del config-server para los servicios cliente | `http://config-server:8888` |
 | `EUREKA_SERVER_URI` | URL del eureka-server para el registro de servicios | `http://eureka-server:8761/eureka` |
 | `ZIPKIN_URI` | URL del servidor Zipkin para trazabilidad | `http://zipkin:9411` |
 | `DB_HOST` | Host de la base de datos PostgreSQL | `postgres` |
 | `DB_PORT` | Puerto de la base de datos | `5432` |
+| `DB_NAME` | Nombre de la base de datos | `sma_licensing` |
 | `DB_USER` | Usuario de la base de datos | `sma_user` |
-| `DB_PASSWORD` | Contraseña de la base de datos | `changeme` |
+| `DB_PASSWORD` | Contraseña de la base de datos | `sma_password` |
 
 ## Estado del proyecto
 
@@ -107,7 +110,7 @@ Cópialo desde `.env.example` y ajusta los valores según tu entorno.
 | Etapa 1 | `config-server` + `eureka-server` | ✅ Completada |
 | Etapa 2 | `licensing-service`: esqueleto REST + i18n + HATEOAS + healthcheck | ✅ Completada |
 | Etapa 2b | Docker: Dockerfiles y docker-compose completo con healthchecks | ✅ Completada |
-| Etapa 3 | Config Server con Git + PostgreSQL + Spring Data JPA en licensing | 🔜 Pendiente |
+| Etapa 3 | Persistencia con PostgreSQL + Spring Data JPA + config centralizada | ✅ Completada |
 | Etapa 4 | `organization-service` + comunicación entre servicios + correlationId | 🔜 Pendiente |
 | Etapa 5 | Resilience4j: circuit breaker, retry, bulkhead, rate limiter, fallback | 🔜 Pendiente |
 | Etapa 6 | `gateway-server`: rutas, pre-filter y post-filter | 🔜 Pendiente |
