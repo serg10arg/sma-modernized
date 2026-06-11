@@ -23,8 +23,6 @@ spring:
       # Ejecuta schema.sql y data.sql al arrancar
       mode: always
 
-# Configuración de Eureka preparada para la Etapa 4 (aún sin efecto:
-# el licensing-service todavía no incluye la dependencia eureka-client)
 eureka:
   client:
     service-url:

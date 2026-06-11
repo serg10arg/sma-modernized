@@ -39,13 +39,12 @@ tecnológico moderno de Spring.
 
 | Servicio | Descripción | Puerto |
 |---|---|---|
-| `config-server` | Configuración centralizada (Spring Cloud Config) | 8888 |
-| `eureka-server` | Registro y descubrimiento de servicios | 8761 |
-| `gateway-server` | API Gateway y enrutamiento | 8072 |
-| `licensing-service` | Gestión de licencias de software | 8080 |
-| `organization-service` | Gestión de organizaciones | 8081 |
-| `postgres` | Base de datos relacional (bases `sma_licensing` y `sma_organization`) | 5432 |
-| `zipkin` | Trazabilidad distribuida | 9411 |
+| config-server | Configuración centralizada | 8888 |
+| eureka-server | Descubrimiento de servicios | 8761 |
+| gateway-server | Punto de entrada único y enrutado | 8072 |
+| organization-service | Gestión de organizaciones | Registrado en Eureka (sin puerto público) |
+| licensing-service | Gestión de licencias | Registrado en Eureka (sin puerto público) |
+| zipkin | Trazabilidad distribuida | 9411 |
 
 ## Ejecución del sistema completo
 
@@ -110,15 +109,13 @@ El archivo `.env` en la raíz controla la configuración del sistema. Cópialo d
 
 | Etapa | Descripción | Estado |
 |---|---|---|
-| Paso 0 | Inicialización del monorepo | ✅ Completada |
-| Etapa 1 | `config-server` + `eureka-server` | ✅ Completada |
-| Etapa 2 | `licensing-service`: esqueleto REST + i18n + HATEOAS + healthcheck | ✅ Completada |
-| Etapa 2b | Docker: Dockerfiles y docker-compose completo con healthchecks | ✅ Completada |
-| Etapa 3 | Persistencia PostgreSQL + Spring Data JPA + config centralizada | ✅ Completada |
-| Etapa 4 | `organization-service` + comunicación entre servicios + correlationId | ✅ Completada |
-| Etapa 5 | Resilience4j: circuit breaker, retry, bulkhead, rate limiter, fallback | ✅ Completada |
-| Etapa 6 | `gateway-server`: rutas, pre-filter y post-filter | 🔜 Pendiente |
-| Etapa 7 | Seguridad OAuth2 + JWT | 🔜 Pendiente |
-| Etapa 8 | Mensajería asíncrona con Kafka + caché con Redis | 🔜 Pendiente |
-| Etapa 9 | Trazabilidad distribuida con Micrometer + Zipkin | 🔜 Pendiente |
-| Etapa 10 | Despliegue en cloud (CI/CD) | ⏸️ Fuera de alcance actual |
+| 0 | Esqueleto monorepo | Completa |
+| 1 | config-server + eureka-server | Completa |
+| 2 | licensing-service (REST, i18n, HATEOAS) + Docker | Completa |
+| 3 | Persistencia PostgreSQL (licensing-service) | Completa |
+| 4 | organization-service + comunicación entre servicios | Completa |
+| 5 | Resiliencia (Resilience4j) en licensing-service | Completa |
+| 6 | gateway-server (enrutado + correlación) | Completa |
+| 7 | Seguridad (OAuth2 + JWT) | Siguiente |
+| 8 | Mensajería asíncrona (Kafka / Spring Cloud Stream) | Pendiente |
+| 9 | Trazabilidad distribuida (Micrometer + Zipkin) | Pendiente |

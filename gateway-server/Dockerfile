@@ -2,31 +2,37 @@
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /workspace
 
+# Copia el parent pom para resolver dependencias del monorepo
 COPY pom.xml .
 # Los pom de los módulos hermanos son necesarios para que el reactor de Maven
 # resuelva el agregador (el parent los declara en <modules>). No se compilan:
-# con -pl organization-service -am solo se construye este servicio y el parent.
+# con -pl gateway-server -am solo se construye este servicio y el parent.
 COPY config-server/pom.xml config-server/
 COPY eureka-server/pom.xml eureka-server/
 COPY gateway-server/pom.xml gateway-server/
 COPY licensing-service/pom.xml licensing-service/
 COPY organization-service/pom.xml organization-service/
 
-RUN mvn dependency:go-offline -pl organization-service -am -q
+# Descarga dependencias antes de copiar el código fuente (caché de capas)
+RUN mvn dependency:go-offline -pl gateway-server -am -q
 
-COPY organization-service/src organization-service/src
-RUN mvn package -pl organization-service -am -DskipTests -q
+# Copia el código fuente y construye el JAR
+COPY gateway-server/src gateway-server/src
+RUN mvn package -pl gateway-server -am -DskipTests -q
 
 # ── Etapa de ejecución ─────────────────────────────────────────────
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
-COPY --from=build /workspace/organization-service/target/*.jar app.jar
+# Copia solo el JAR generado en la etapa anterior
+COPY --from=build /workspace/gateway-server/target/*.jar app.jar
 
-EXPOSE 8081
+# Puerto que expone el gateway
+EXPOSE 8072
 
+# Healthcheck: verifica cada 10s que el endpoint de salud responde correctamente
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider \
-  http://localhost:8081/actuator/health || exit 1
+  http://localhost:8072/actuator/health || exit 1
 
 ENTRYPOINT ["java", "-jar", "app.jar"]

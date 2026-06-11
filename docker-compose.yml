@@ -71,6 +71,33 @@ services:
     networks:
       - sma-network
 
+  # --- Gateway Server (API Gateway) ---
+  gateway-server:
+    build:
+      context: .
+      dockerfile: gateway-server/Dockerfile
+    container_name: gateway-server
+    ports:
+      - "8072:8072"
+    environment:
+      CONFIG_SERVER_URI: http://config-server:8888
+      EUREKA_SERVER_URI: http://eureka-server:8761/eureka/
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-default}
+    depends_on:
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider",
+             "http://localhost:8072/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - sma-network
+
   # --- Licensing Service ---
   licensing-service:
     build:

@@ -9,6 +9,7 @@ COPY pom.xml .
 # con -pl licensing-service -am solo se construye este servicio y el parent.
 COPY config-server/pom.xml config-server/
 COPY eureka-server/pom.xml eureka-server/
+COPY gateway-server/pom.xml gateway-server/
 COPY licensing-service/pom.xml licensing-service/
 COPY organization-service/pom.xml organization-service/
 

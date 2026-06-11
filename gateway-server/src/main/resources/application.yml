@@ -1,0 +1,8 @@
+spring:
+  application:
+    # Nombre del servicio; determina qué archivo de config solicita al config-server
+    name: gateway-server
+  config:
+    # Importa la configuración del config-server al arrancar.
+    # En Docker se sobreescribe CONFIG_SERVER_URI; en local usa el valor por defecto.
+    import: "configserver:${CONFIG_SERVER_URI:http://localhost:8888}"
