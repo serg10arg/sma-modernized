@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -45,4 +46,9 @@ public class License extends RepresentationModel<License> {
     // Comentario adicional asociado a la licencia
     @Column(name = "comment")
     private String comment;
+
+    // Datos de la organización asociada, obtenidos del organization-service.
+    // @Transient: no se persiste en la base de datos del licensing-service.
+    @Transient
+    private Organization organization;
 }

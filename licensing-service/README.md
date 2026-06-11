@@ -4,29 +4,29 @@
 
 Microservicio de gestión de licencias de software del sistema sma-modernized.
 Expone una API REST para consultar, crear, actualizar y eliminar licencias
-asociadas a organizaciones. Persiste los datos en PostgreSQL mediante Spring
-Data JPA y obtiene su configuración del servidor de configuración centralizada.
-Las respuestas incluyen links hipermedia (HATEOAS) y los mensajes se adaptan al
-idioma del cliente.
+asociadas a organizaciones. Persiste los datos en PostgreSQL, obtiene su
+configuración del servidor de configuración centralizada y se registra en el
+servidor de descubrimiento. Al consultar una licencia, enriquece la respuesta con
+los datos de su organización, obtenidos del organization-service mediante
+descubrimiento de servicios.
 
 ## Etapa
 
-Introducido en la **Etapa 2** como esqueleto REST básico, completado en la misma
-etapa con internacionalización, Spring HATEOAS y un Dockerfile con healthcheck.
-En la **Etapa 3** se incorporó la persistencia en PostgreSQL con Spring Data JPA
-y la integración con el servidor de configuración centralizada.
-
-Las etapas posteriores añadirán el registro en Eureka, la comunicación con el
-organization-service y la seguridad OAuth2.
+Introducido en la **Etapa 2** (esqueleto REST con i18n, HATEOAS y healthcheck),
+ampliado en la **Etapa 3** con persistencia en PostgreSQL y configuración
+centralizada, y en la **Etapa 4** con el registro en Eureka, la comunicación con
+el organization-service y la propagación de un identificador de correlación.
 
 ## Responsabilidades
 
 - Exponer los endpoints REST CRUD de licencias por organización
 - Persistir las licencias en PostgreSQL mediante Spring Data JPA
-- Devolver la representación JSON de una licencia con links hipermedia (HATEOAS)
-- Adaptar los mensajes de respuesta al idioma del cliente (header `Accept-Language`)
-- Obtener su configuración del config-server al arrancar
-- Publicar el endpoint de salud `/actuator/health` para verificación operacional
+- Registrarse en el servidor de descubrimiento (Eureka)
+- Enriquecer cada licencia con los datos de su organización, consultando el
+  organization-service por descubrimiento de servicios
+- Generar y propagar un identificador de correlación (`tmx-correlation-id`) entre servicios
+- Devolver respuestas con links hipermedia (HATEOAS) e i18n según `Accept-Language`
+- Publicar el endpoint de salud `/actuator/health`
 
 ## Tecnologías
 
@@ -37,41 +37,35 @@ organization-service y la seguridad OAuth2.
 | Spring Web (Tomcat) | 3.3.x | Servidor HTTP embebido y capa REST |
 | Spring Data JPA | 3.3.x | Acceso a datos y mapeo objeto-relacional |
 | Spring Cloud Config Client | 4.x | Lectura de configuración centralizada |
+| Spring Cloud Netflix Eureka Client | 4.x | Registro y descubrimiento de servicios |
+| Spring Cloud LoadBalancer | 4.x | Balanceo de carga del lado cliente |
+| RestClient | 6.1+ | Cliente HTTP síncrono para llamar al organization-service |
 | Spring HATEOAS | 3.3.x | Links hipermedia en las respuestas REST |
 | Spring Boot Actuator | 3.3.x | Endpoints de salud y métricas |
-| PostgreSQL | 16 | Base de datos relacional |
+| PostgreSQL | 16 | Base de datos relacional (base `sma_licensing`) |
 | Lombok | - | Reducción de boilerplate en el modelo |
 | Maven | 3.9.x | Herramienta de construcción |
 | Docker | - | Contenerización del servicio |
 
 ## Configuración
 
-El servicio mantiene en su `application.yml` local únicamente el nombre del
-servicio y la importación de la configuración remota. El resto de la
-configuración (puerto, datasource, JPA) se sirve desde el config-server, en el
-archivo `config/licensing-service.yml`.
+El `application.yml` local contiene solo el nombre del servicio y la importación de
+la configuración remota. El resto se sirve desde el config-server en
+`config/licensing-service.yml`.
 
 ### Configuración local (`application.yml`)
 
 | Propiedad | Valor | Descripción |
 |---|---|---|
-| `spring.application.name` | `licensing-service` | Determina qué archivo de configuración solicita al config-server |
-| `spring.config.import` | `configserver:${CONFIG_SERVER_URI:http://localhost:8888}` | URI del config-server; sobreescribible por variable de entorno |
-
-### Configuración centralizada (servida por el config-server)
-
-| Propiedad | Valor | Descripción |
-|---|---|---|
-| `server.port` | `8080` | Puerto del servidor HTTP |
-| `spring.datasource.url` | `jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}` | URL de conexión a PostgreSQL |
-| `spring.jpa.hibernate.ddl-auto` | `none` | El esquema lo gestiona `schema.sql`, no Hibernate |
-| `spring.sql.init.mode` | `always` | Ejecuta `schema.sql` y `data.sql` al arrancar |
+| `spring.application.name` | `licensing-service` | Nombre lógico; con él se registra en Eureka y solicita su config |
+| `spring.config.import` | `configserver:${CONFIG_SERVER_URI:http://localhost:8888}` | URI del config-server |
 
 ### Variables de entorno
 
 | Variable | Por defecto | Descripción |
 |---|---|---|
 | `CONFIG_SERVER_URI` | `http://localhost:8888` | URI del servidor de configuración |
+| `EUREKA_SERVER_URI` | `http://localhost:8761/eureka/` | URI del servidor de descubrimiento |
 | `DB_HOST` | `localhost` | Host de PostgreSQL |
 | `DB_PORT` | `5432` | Puerto de PostgreSQL |
 | `DB_NAME` | `sma_licensing` | Nombre de la base de datos |
@@ -80,45 +74,44 @@ archivo `config/licensing-service.yml`.
 
 ### Internacionalización
 
-Los mensajes se externalizan en `src/main/resources`:
+Mensajes en `messages.properties` (inglés) y `messages_es.properties` (español),
+con placeholders nativos de `MessageSource` (`{0}`, `{1}`). El idioma se selecciona
+según el header `Accept-Language`.
 
-- `messages.properties` — inglés (idioma por defecto)
-- `messages_es.properties` — español
+### Identificador de correlación
 
-Usan placeholders nativos de `MessageSource` (`{0}`, `{1}`). El idioma se
-selecciona automáticamente según el header `Accept-Language`.
+Cada petición entrante recibe un identificador de correlación: si la cabecera
+`tmx-correlation-id` viene en la petición, se reutiliza; si no, se genera uno nuevo.
+Ese identificador se devuelve en la respuesta y se propaga automáticamente en las
+llamadas salientes al organization-service, permitiendo seguir el rastro de una
+operación a través de los servicios. Es la base sobre la que se construirá la
+trazabilidad distribuida en una etapa posterior.
 
 ## Ejecución local
 
-El servicio requiere que el config-server y una instancia de PostgreSQL estén
-disponibles. La forma más sencilla es levantar todo con Docker Compose.
-
-**Con Docker Compose (desde la raíz del monorepo):**
+Requiere config-server, Eureka, PostgreSQL y el organization-service disponibles.
+Lo más simple es Docker Compose.
 
 ```bash
 docker compose up --build licensing-service
 ```
 
-**Solo el servicio con Maven (requiere config-server y PostgreSQL ya activos):**
-
-```bash
-mvn clean package -pl licensing-service -am -DskipTests
-mvn spring-boot:run -pl licensing-service
-```
-
 ## API
 
-Todos los endpoints aceptan el header `Accept-Language` (`en` o `es`).
+Todos los endpoints aceptan el header `Accept-Language` (`en` o `es`) y, opcionalmente,
+`tmx-correlation-id`.
 
 ### GET /v1/organization/{organizationId}/license/{licenseId}
 
-Obtiene una licencia específica, con links HATEOAS. Devuelve HTTP 404 si no existe.
+Obtiene una licencia, enriquecida con los datos de su organización y con links HATEOAS.
+Devuelve HTTP 404 si la licencia no existe.
 
 **Request:**
 
 ```
 GET /v1/organization/org-001/license/lic-001
 Accept-Language: es
+tmx-correlation-id: test-corr-123
 ```
 
 **Response (HTTP 200):**
@@ -131,6 +124,13 @@ Accept-Language: es
   "productName": "O-stock",
   "licenseType": "full",
   "comment": "Registro de ejemplo",
+  "organization": {
+    "organizationId": "org-001",
+    "name": "Organización de prueba",
+    "contactName": "Ana Contacto",
+    "contactEmail": "ana@ejemplo.com",
+    "contactPhone": "600000000"
+  },
   "_links": {
     "self": { "href": "http://localhost:8080/v1/organization/org-001/license/lic-001" },
     "createLicense": { "href": "http://localhost:8080/v1/organization/org-001/license" },
@@ -140,13 +140,7 @@ Accept-Language: es
 }
 ```
 
-**Response (HTTP 404):**
-
-```json
-{
-  "error": "No se puede encontrar la licencia con id NO-EXISTE para la organización org-001"
-}
-```
+La respuesta incluye además la cabecera `tmx-correlation-id` con el valor recibido o generado.
 
 ---
 
@@ -154,46 +148,11 @@ Accept-Language: es
 
 Lista todas las licencias de una organización.
 
-**Response (HTTP 200):**
-
-```json
-[
-  {
-    "licenseId": "lic-001",
-    "organizationId": "org-001",
-    "description": "Licencia de prueba",
-    "productName": "O-stock",
-    "licenseType": "full",
-    "comment": "Registro de ejemplo"
-  }
-]
-```
-
 ---
 
 ### POST /v1/organization/{organizationId}/license
 
 Crea una nueva licencia. Asigna un `licenseId` aleatorio y la persiste.
-
-**Request:**
-
-```
-POST /v1/organization/org-001/license
-Accept-Language: es
-Content-Type: application/json
-
-{
-  "description": "Licencia de produccion",
-  "productName": "O-stock",
-  "licenseType": "full"
-}
-```
-
-**Response (HTTP 200):**
-
-```
-Licencia creada License(licenseId=..., organizationId=org-001, ...)
-```
 
 ---
 
@@ -201,44 +160,17 @@ Licencia creada License(licenseId=..., organizationId=org-001, ...)
 
 Actualiza una licencia existente.
 
-**Request:**
-
-```
-PUT /v1/organization/org-001/license
-Accept-Language: es
-Content-Type: application/json
-
-{
-  "licenseId": "lic-001",
-  "description": "Descripción actualizada",
-  "productName": "O-stock",
-  "licenseType": "full"
-}
-```
-
-**Response (HTTP 200):**
-
-```
-Licencia actualizada License(...)
-```
-
 ---
 
 ### DELETE /v1/organization/{organizationId}/license/{licenseId}
 
 Elimina una licencia. Devuelve HTTP 404 si no existe.
 
-**Response (HTTP 200):**
-
-```
-Licencia eliminada lic-001
-```
-
 ---
 
 ### GET /actuator/health
 
-Verifica el estado operacional del servicio. Usado por el healthcheck del contenedor.
+Verifica el estado operacional del servicio.
 
 ```json
 { "status": "UP" }
@@ -248,25 +180,24 @@ Verifica el estado operacional del servicio. Usado por el healthcheck del conten
 
 | Decisión tomada | Alternativas consideradas | Motivo de la elección |
 |---|---|---|
-| PostgreSQL 16 | MySQL, H2 en memoria | Base de datos robusta estándar; con volumen persistente sobrevive a reinicios, a diferencia de H2 |
-| Spring Data JPA | JDBC plano, MyBatis | Reduce boilerplate; integración nativa con Spring Boot |
-| `licenseId` (String) como clave primaria | Campo `id` numérico autogenerado | El identificador de negocio es único y significativo; evita una clave artificial redundante |
-| `ddl-auto: none` + `schema.sql` | `ddl-auto: update` de Hibernate | Control explícito del esquema; `update` no es seguro ni predecible para entornos reales |
-| `spring.config.import` | `bootstrap.yml` | El `bootstrap.yml` está obsoleto en Spring Boot 3.x; `spring.config.import` es el mecanismo actual |
-| `MessageSource` con placeholders `{0}` | `String.format` con `%s` | Es el mecanismo nativo de Spring para i18n; evita el doble procesamiento de cadenas |
-| Una sola clase `License` (entidad + HATEOAS) | DTO separado de la entidad | Mantiene la etapa simple; la separación en DTO queda como posible refactor futuro |
+| `RestClient` con `@LoadBalanced` | `RestTemplate`, OpenFeign, `WebClient` | `RestTemplate` está en mantenimiento; `RestClient` es el cliente síncrono moderno; el balanceo permite llamar al servicio por nombre lógico |
+| Descubrimiento por nombre vía Eureka | URL fija del organization-service | Desacopla los servicios de direcciones físicas; las instancias pueden cambiar sin reconfigurar |
+| Propagar el error si el servicio remoto falla | Degradación manual con try/catch | La resiliencia (circuit breaker, fallback) se implementará correctamente con Resilience4j en una etapa posterior; un try/catch ahora sería código desechable |
+| Modelo `Organization` ligero (POJO) | Reutilizar la entidad del organization-service | El licensing-service solo consume organizaciones, no las persiste; no necesita una entidad JPA |
+| Campo `@Transient organization` en License | Crear un DTO de respuesta separado | Mantiene la etapa simple; el campo no se persiste en la base del licensing-service |
+| correlationId con `ThreadLocal` + filtro + interceptor | No implementarlo aún | Sienta la base de la trazabilidad distribuida y evita retrabajo en etapas posteriores |
 
 ## Dependencias con otros servicios
 
 | Servicio | Estado | Motivo |
 |---|---|---|
-| `config-server` | Activo | Provee la configuración del servicio al arrancar |
-| PostgreSQL | Activo | Almacena las licencias |
+| `config-server` | Activo | Provee la configuración al arrancar |
+| `eureka-server` | Activo | Registro propio y descubrimiento del organization-service |
+| `organization-service` | Activo | Provee los datos de organización para enriquecer las licencias |
+| PostgreSQL | Activo | Almacena las licencias (base `sma_licensing`) |
 
 Las siguientes se incorporarán en etapas futuras:
 
 | Servicio | Etapa | Motivo |
 |---|---|---|
-| `eureka-server` | Etapa 4 | Registro y descubrimiento de servicio |
-| `organization-service` | Etapa 4 | Resolución del nombre de la organización por ID |
 | `gateway-server` | Etapa 6 | Enrutamiento centralizado de peticiones |

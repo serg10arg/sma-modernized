@@ -1,7 +1,9 @@
 package com.sma.licensing.service;
 
+import com.sma.licensing.client.OrganizationRestClient;
 import com.sma.licensing.exception.LicenseNotFoundException;
 import com.sma.licensing.model.License;
+import com.sma.licensing.model.Organization;
 import com.sma.licensing.repository.LicenseRepository;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
@@ -25,23 +27,37 @@ public class LicenseService {
     // Repositorio de acceso a datos de licencias
     private final LicenseRepository licenseRepository;
 
-    public LicenseService(MessageSource messages, LicenseRepository licenseRepository) {
+    // Cliente del organization-service (descubierto por nombre en Eureka)
+    private final OrganizationRestClient organizationRestClient;
+
+    public LicenseService(MessageSource messages,
+                          LicenseRepository licenseRepository,
+                          OrganizationRestClient organizationRestClient) {
         this.messages = messages;
         this.licenseRepository = licenseRepository;
+        this.organizationRestClient = organizationRestClient;
     }
 
     /**
-     * Recupera una licencia por su id y el id de organización.
-     * Lanza LicenseNotFoundException (HTTP 404) si no existe.
+     * Recupera una licencia y la enriquece con los datos de su organización,
+     * consultando el organization-service vía Eureka.
+     * Lanza LicenseNotFoundException (HTTP 404) si la licencia no existe.
      */
     public License getLicense(String licenseId, String organizationId, Locale locale) {
-        return licenseRepository
+        License license = licenseRepository
                 .findByOrganizationIdAndLicenseId(organizationId, licenseId)
                 .orElseThrow(() -> new LicenseNotFoundException(
                         messages.getMessage(
                                 "license.search.error.message",
                                 new Object[]{licenseId, organizationId},
                                 locale)));
+
+        // Enriquecimiento: consulta el organization-service por descubrimiento.
+        // Si el servicio remoto falla, la excepción se propaga (Etapa 5 añadirá resiliencia).
+        Organization organization = organizationRestClient.getOrganization(organizationId);
+        license.setOrganization(organization);
+
+        return license;
     }
 
     /**

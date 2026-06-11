@@ -44,7 +44,7 @@ tecnológico moderno de Spring.
 | `gateway-server` | API Gateway y enrutamiento | 8072 |
 | `licensing-service` | Gestión de licencias de software | 8080 |
 | `organization-service` | Gestión de organizaciones | 8081 |
-| `postgres` | Base de datos relacional | 5432 |
+| `postgres` | Base de datos relacional (bases `sma_licensing` y `sma_organization`) | 5432 |
 | `zipkin` | Trazabilidad distribuida | 9411 |
 
 ## Ejecución del sistema completo
@@ -73,11 +73,8 @@ docker compose up --build
 docker compose ps
 ```
 
-**Levantar solo un servicio específico:**
-
-```bash
-docker compose up licensing-service
-```
+**Verificar el registro de servicios** en el dashboard de Eureka:
+`http://localhost:8761`
 
 **Detener el sistema:**
 
@@ -85,22 +82,29 @@ docker compose up licensing-service
 docker compose down
 ```
 
+> Nota: la primera vez que se levanta el sistema, el contenedor de PostgreSQL crea
+> las dos bases de datos mediante un script de inicialización. Si se necesita
+> recrear ese script (por ejemplo, tras cambiarlo), hay que recrear el volumen con
+> `docker compose down -v`, lo que borra los datos almacenados.
+
 ## Variables de entorno
 
-El archivo `.env` en la raíz del proyecto controla la configuración del sistema.
-Cópialo desde `.env.example` y ajusta los valores según tu entorno.
+El archivo `.env` en la raíz controla la configuración del sistema. Cópialo desde
+`.env.example` y ajusta los valores.
 
 | Variable | Descripción | Valor de ejemplo |
 |---|---|---|
-| `SPRING_PROFILES_ACTIVE` | Perfil de Spring activo en todos los servicios | `default` |
 | `CONFIG_SERVER_URI` | URL del config-server para los servicios cliente | `http://config-server:8888` |
-| `EUREKA_SERVER_URI` | URL del eureka-server para el registro de servicios | `http://eureka-server:8761/eureka` |
+| `EUREKA_SERVER_URI` | URL del eureka-server para el registro de servicios | `http://eureka-server:8761/eureka/` |
 | `ZIPKIN_URI` | URL del servidor Zipkin para trazabilidad | `http://zipkin:9411` |
-| `DB_HOST` | Host de la base de datos PostgreSQL | `postgres` |
-| `DB_PORT` | Puerto de la base de datos | `5432` |
-| `DB_NAME` | Nombre de la base de datos | `sma_licensing` |
+| `DB_HOST` | Host de PostgreSQL | `postgres` |
+| `DB_PORT` | Puerto de PostgreSQL | `5432` |
+| `DB_NAME` | Base de datos del licensing-service | `sma_licensing` |
 | `DB_USER` | Usuario de la base de datos | `sma_user` |
 | `DB_PASSWORD` | Contraseña de la base de datos | `sma_password` |
+| `ORG_DB_NAME` | Base de datos del organization-service | `sma_organization` |
+| `ORG_DB_USER` | Usuario de la base de datos de organización | `sma_user` |
+| `ORG_DB_PASSWORD` | Contraseña de la base de datos de organización | `sma_password` |
 
 ## Estado del proyecto
 
@@ -111,7 +115,7 @@ Cópialo desde `.env.example` y ajusta los valores según tu entorno.
 | Etapa 2 | `licensing-service`: esqueleto REST + i18n + HATEOAS + healthcheck | ✅ Completada |
 | Etapa 2b | Docker: Dockerfiles y docker-compose completo con healthchecks | ✅ Completada |
 | Etapa 3 | Persistencia con PostgreSQL + Spring Data JPA + config centralizada | ✅ Completada |
-| Etapa 4 | `organization-service` + comunicación entre servicios + correlationId | 🔜 Pendiente |
+| Etapa 4 | `organization-service` + descubrimiento (Eureka) + comunicación entre servicios + correlationId | ✅ Completada |
 | Etapa 5 | Resilience4j: circuit breaker, retry, bulkhead, rate limiter, fallback | 🔜 Pendiente |
 | Etapa 6 | `gateway-server`: rutas, pre-filter y post-filter | 🔜 Pendiente |
 | Etapa 7 | Seguridad OAuth2 + Keycloak + JWT | 🔜 Pendiente |
