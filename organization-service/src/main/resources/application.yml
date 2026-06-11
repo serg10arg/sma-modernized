@@ -1,0 +1,7 @@
+spring:
+  application:
+    # Determina qué archivo de config solicita al config-server
+    name: organization-service
+  config:
+    # Importa la configuración del config-server al arrancar
+    import: "configserver:${CONFIG_SERVER_URI:http://localhost:8888}"

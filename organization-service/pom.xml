@@ -13,9 +13,9 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>licensing-service</artifactId>
-    <name>licensing-service</name>
-    <description>Microservicio de gestión de licencias</description>
+    <artifactId>organization-service</artifactId>
+    <name>organization-service</name>
+    <description>Microservicio de gestión de organizaciones</description>
 
     <dependencies>
 
@@ -31,24 +31,10 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
-        <!-- Tests -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- Spring HATEOAS: soporte para links hipermedia en las respuestas REST -->
+        <!-- Spring HATEOAS: la entidad Organization extiende RepresentationModel -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-hateoas</artifactId>
-        </dependency>
-
-        <!-- Lombok: genera getters/setters/toString para el modelo License -->
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <optional>true</optional>
         </dependency>
 
         <!-- Persistencia con Spring Data JPA -->
@@ -64,7 +50,7 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Cliente de Spring Cloud Config: lee la configuración del config-server -->
+        <!-- Cliente de Spring Cloud Config -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-config</artifactId>
@@ -76,16 +62,28 @@
             <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
         </dependency>
 
+        <!-- Tests -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
     </dependencies>
 
     <build>
         <plugins>
-            <!-- Plugin para construir y ejecutar con Maven -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-                    <!-- Excluye Lombok del JAR final (solo se usa en compilación) -->
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>
@@ -94,10 +92,6 @@
                     </excludes>
                 </configuration>
             </plugin>
-
-            <!-- Registra Lombok como procesador de anotaciones.
-                 Necesario en JDK 21+, donde javac ya no ejecuta procesadores
-                 presentes solo en el classpath. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>

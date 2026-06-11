@@ -23,6 +23,7 @@
         <module>config-server</module>
         <module>eureka-server</module>
         <module>licensing-service</module>
+        <module>organization-service</module>
     </modules>
 
     <properties>

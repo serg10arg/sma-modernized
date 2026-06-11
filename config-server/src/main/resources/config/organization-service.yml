@@ -2,13 +2,27 @@ server:
   port: 8081
 
 spring:
-  application:
-    name: organization-service
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${ORG_DB_NAME:sma_organization}
+    username: ${ORG_DB_USER:sma_user}
+    password: ${ORG_DB_PASSWORD:sma_password}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  sql:
+    init:
+      mode: always
 
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_SERVER_URI:http://localhost:8761/eureka/}
   instance:
     prefer-ip-address: true
 
@@ -17,3 +31,6 @@ management:
     web:
       exposure:
         include: health,info
+  endpoint:
+    health:
+      show-details: always
