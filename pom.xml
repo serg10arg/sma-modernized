@@ -65,6 +65,13 @@
                 <scope>import</scope>
             </dependency>
 
+            <!-- Resilience4j: patrones de resiliencia (circuit breaker, retry, etc.) -->
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-spring-boot3</artifactId>
+                <version>${resilience4j.version}</version>
+            </dependency>
+
             <!-- Sobrescribe la versión de Lombok gestionada por el BOM de Spring Boot.
                  Una declaración directa tiene prioridad sobre los BOM importados. -->
             <dependency>

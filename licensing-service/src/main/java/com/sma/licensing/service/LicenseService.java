@@ -5,9 +5,14 @@ import com.sma.licensing.exception.LicenseNotFoundException;
 import com.sma.licensing.model.License;
 import com.sma.licensing.model.Organization;
 import com.sma.licensing.repository.LicenseRepository;
+import io.github.resilience4j.bulkhead.annotation.Bulkhead;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -62,9 +67,29 @@ public class LicenseService {
 
     /**
      * Devuelve todas las licencias de una organización.
+     * Protegida con los patrones de resiliencia de Resilience4j; ante fallo o
+     * saturación se devuelve la lista de fallback.
      */
+    @CircuitBreaker(name = "licenseService", fallbackMethod = "buildFallbackLicenseList")
+    @RateLimiter(name = "licenseService")
+    @Retry(name = "retryLicenseService")
+    @Bulkhead(name = "bulkheadLicenseService")
     public List<License> getLicensesByOrganization(String organizationId) {
         return licenseRepository.findByOrganizationId(organizationId);
+    }
+
+    /**
+     * Fallback de getLicensesByOrganization: devuelve una lista mínima indicando
+     * que la información no está disponible temporalmente.
+     */
+    private List<License> buildFallbackLicenseList(String organizationId, Throwable t) {
+        List<License> fallbackList = new ArrayList<>();
+        License license = new License();
+        license.setLicenseId("0000000-00-00000");
+        license.setOrganizationId(organizationId);
+        license.setProductName("Información de licencias no disponible temporalmente");
+        fallbackList.add(license);
+        return fallbackList;
     }
 
     /**

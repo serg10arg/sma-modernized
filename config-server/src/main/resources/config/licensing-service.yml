@@ -36,7 +36,54 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,circuitbreakers,circuitbreakerevents
   endpoint:
     health:
       show-details: always
+  health:
+    circuitbreakers:
+      enabled: true
+
+# --- Resilience4j (Etapa 5) ---
+resilience4j.circuitbreaker:
+  instances:
+    licenseService:
+      registerHealthIndicator: true
+      slidingWindowType: COUNT_BASED
+      slidingWindowSize: 5
+      permittedNumberOfCallsInHalfOpenState: 3
+      waitDurationInOpenState: 10s
+      failureRateThreshold: 50
+      recordExceptions:
+        - org.springframework.web.client.HttpServerErrorException
+        - java.io.IOException
+        - java.util.concurrent.TimeoutException
+        - org.springframework.web.client.ResourceAccessException
+    organizationService:
+      registerHealthIndicator: true
+      slidingWindowType: COUNT_BASED
+      slidingWindowSize: 6
+      permittedNumberOfCallsInHalfOpenState: 4
+      waitDurationInOpenState: 20s
+      failureRateThreshold: 60
+
+resilience4j.retry:
+  instances:
+    retryLicenseService:
+      maxAttempts: 5
+      waitDuration: 10000ms
+      retryExceptions:
+        - java.util.concurrent.TimeoutException
+
+resilience4j.bulkhead:
+  instances:
+    bulkheadLicenseService:
+      maxConcurrentCalls: 5
+      maxWaitDuration: 10ms
+
+resilience4j.ratelimiter:
+  instances:
+    licenseService:
+      timeoutDuration: 1000ms
+      limitRefreshPeriod: 5s
+      limitForPeriod: 5

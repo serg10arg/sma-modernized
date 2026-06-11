@@ -1,6 +1,8 @@
 package com.sma.licensing.client;
 
 import com.sma.licensing.model.Organization;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -20,12 +22,26 @@ public class OrganizationRestClient {
 
     /**
      * Recupera una organización por su id desde el organization-service.
-     * Si el servicio remoto falla, la excepción se propaga (sin resiliencia en esta etapa).
+     * Protegida con circuit breaker y retry: si el servicio remoto falla de forma
+     * persistente, se devuelve la organización de fallback.
      */
+    @CircuitBreaker(name = "organizationService", fallbackMethod = "buildFallbackOrganization")
+    @Retry(name = "retryLicenseService", fallbackMethod = "buildFallbackOrganization")
     public Organization getOrganization(String organizationId) {
         return organizationRestClient.get()
                 .uri("http://organization-service/v1/organization/{id}", organizationId)
                 .retrieve()
                 .body(Organization.class);
+    }
+
+    /**
+     * Fallback de getOrganization: devuelve una organización mínima indicando
+     * que el servicio no está disponible temporalmente.
+     */
+    private Organization buildFallbackOrganization(String organizationId, Throwable t) {
+        Organization org = new Organization();
+        org.setOrganizationId(organizationId);
+        org.setName("Organización no disponible temporalmente");
+        return org;
     }
 }

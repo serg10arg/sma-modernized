@@ -24,7 +24,7 @@ tecnológico moderno de Spring.
 | Spring Cloud LoadBalancer | 4.x | Balanceo de carga del lado cliente |
 | Spring Data JPA | 3.3.x | Acceso a datos y mapeo objeto-relacional |
 | PostgreSQL | 16 | Base de datos relacional |
-| Resilience4j | 2.x | Patrones de resiliencia (circuit breaker, retry, etc.) |
+| Resilience4j | 2.2.0 | Tolerancia a fallos: circuit breaker, retry, bulkhead, rate limiter y fallback |
 | Spring Security 6 + OAuth2 | 6.x | Autenticación y autorización |
 | Spring Cloud Stream + Kafka | 4.x | Mensajería asíncrona |
 | Micrometer Tracing + Zipkin | - | Trazabilidad distribuida |
@@ -114,11 +114,11 @@ El archivo `.env` en la raíz controla la configuración del sistema. Cópialo d
 | Etapa 1 | `config-server` + `eureka-server` | ✅ Completada |
 | Etapa 2 | `licensing-service`: esqueleto REST + i18n + HATEOAS + healthcheck | ✅ Completada |
 | Etapa 2b | Docker: Dockerfiles y docker-compose completo con healthchecks | ✅ Completada |
-| Etapa 3 | Persistencia con PostgreSQL + Spring Data JPA + config centralizada | ✅ Completada |
-| Etapa 4 | `organization-service` + descubrimiento (Eureka) + comunicación entre servicios + correlationId | ✅ Completada |
-| Etapa 5 | Resilience4j: circuit breaker, retry, bulkhead, rate limiter, fallback | 🔜 Pendiente |
+| Etapa 3 | Persistencia PostgreSQL + Spring Data JPA + config centralizada | ✅ Completada |
+| Etapa 4 | `organization-service` + comunicación entre servicios + correlationId | ✅ Completada |
+| Etapa 5 | Resilience4j: circuit breaker, retry, bulkhead, rate limiter, fallback | ✅ Completada |
 | Etapa 6 | `gateway-server`: rutas, pre-filter y post-filter | 🔜 Pendiente |
-| Etapa 7 | Seguridad OAuth2 + Keycloak + JWT | 🔜 Pendiente |
+| Etapa 7 | Seguridad OAuth2 + JWT | 🔜 Pendiente |
 | Etapa 8 | Mensajería asíncrona con Kafka + caché con Redis | 🔜 Pendiente |
 | Etapa 9 | Trazabilidad distribuida con Micrometer + Zipkin | 🔜 Pendiente |
-| Etapa 10 | Despliegue en cloud (AWS, CI/CD) | ⏸️ Fuera de alcance actual |
+| Etapa 10 | Despliegue en cloud (CI/CD) | ⏸️ Fuera de alcance actual |

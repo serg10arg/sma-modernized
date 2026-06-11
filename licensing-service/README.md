@@ -42,6 +42,8 @@ el organization-service y la propagación de un identificador de correlación.
 | RestClient | 6.1+ | Cliente HTTP síncrono para llamar al organization-service |
 | Spring HATEOAS | 3.3.x | Links hipermedia en las respuestas REST |
 | Spring Boot Actuator | 3.3.x | Endpoints de salud y métricas |
+| Resilience4j (`resilience4j-spring-boot3`) | 2.2.0 | Circuit breaker, retry, bulkhead, rate limiter y fallback |
+| Spring AOP (`spring-boot-starter-aop`) | 3.3.x | Soporte de las anotaciones de Resilience4j |
 | PostgreSQL | 16 | Base de datos relacional (base `sma_licensing`) |
 | Lombok | - | Reducción de boilerplate en el modelo |
 | Maven | 3.9.x | Herramienta de construcción |
@@ -176,16 +178,50 @@ Verifica el estado operacional del servicio.
 { "status": "UP" }
 ```
 
+## Resiliencia
+
+El servicio aplica patrones de resiliencia de cliente con Resilience4j para proteger sus llamadas remotas: el acceso a la base de datos y, sobre todo, la llamada entre servicios hacia `organization-service`. El objetivo es evitar que un fallo o una degradación aguas abajo provoque agotamiento de recursos o una cascada de errores.
+
+### Patrones aplicados
+
+| Patrón | Instancia | Dónde se aplica |
+|---|---|---|
+| Circuit Breaker | `licenseService` | `LicenseService.getLicensesByOrganization` (acceso a BD) |
+| Circuit Breaker | `organizationService` | `OrganizationRestClient.getOrganization` (llamada entre servicios) |
+| Retry | `retryLicenseService` | ambos métodos remotos |
+| Bulkhead (semáforo) | `bulkheadLicenseService` | `LicenseService.getLicensesByOrganization` |
+| Rate Limiter | `licenseService` | `LicenseService.getLicensesByOrganization` |
+| Fallback | — | `buildFallbackLicenseList` y `buildFallbackOrganization` |
+
+### Comportamiento ante fallos
+
+- Cuando la tasa de fallos supera el umbral configurado (50 %) dentro de la ventana deslizante, el circuit breaker pasa a `OPEN` y rechaza nuevas llamadas con `CallNotPermittedException` (fast-fail), devolviendo la respuesta de fallback en milisegundos sin tocar el recurso protegido.
+- Tras `waitDurationInOpenState`, el breaker pasa a `HALF_OPEN` y, si las llamadas de prueba tienen éxito, vuelve a `CLOSED` automáticamente.
+- En todo momento el cliente recibe una respuesta válida: el dato real o una representación degradada ("información no disponible temporalmente"), nunca un error 500.
+
+### Observabilidad
+
+El estado de los circuit breakers se expone vía Spring Boot Actuator:
+
+- `GET /actuator/health` — incluye el indicador de cada breaker (`show-details: always`).
+- `GET /actuator/circuitbreakers` — estado actual de cada breaker.
+- `GET /actuator/circuitbreakerevents` — historial de transiciones y eventos.
+
 ## Decisiones técnicas
 
 | Decisión tomada | Alternativas consideradas | Motivo de la elección |
 |---|---|---|
 | `RestClient` con `@LoadBalanced` | `RestTemplate`, OpenFeign, `WebClient` | `RestTemplate` está en mantenimiento; `RestClient` es el cliente síncrono moderno; el balanceo permite llamar al servicio por nombre lógico |
 | Descubrimiento por nombre vía Eureka | URL fija del organization-service | Desacopla los servicios de direcciones físicas; las instancias pueden cambiar sin reconfigurar |
-| Propagar el error si el servicio remoto falla | Degradación manual con try/catch | La resiliencia (circuit breaker, fallback) se implementará correctamente con Resilience4j en una etapa posterior; un try/catch ahora sería código desechable |
+| Degradación con `fallbackMethod` de Resilience4j ante fallo del servicio remoto | Manejo manual con try/catch | El fallback declarativo mantiene el código de negocio limpio y separa la lógica de resiliencia; integra circuit breaker y retry sin código desechable |
 | Modelo `Organization` ligero (POJO) | Reutilizar la entidad del organization-service | El licensing-service solo consume organizaciones, no las persiste; no necesita una entidad JPA |
 | Campo `@Transient organization` en License | Crear un DTO de respuesta separado | Mantiene la etapa simple; el campo no se persiste en la base del licensing-service |
 | correlationId con `ThreadLocal` + filtro + interceptor | No implementarlo aún | Sienta la base de la trazabilidad distribuida y evita retrabajo en etapas posteriores |
+| Resilience4j con estilo declarativo (anotaciones) | API programática (`CircuitBreakerFactory`) | Más legible y se aplica directamente sobre los métodos remotos ya aislados |
+| `fallbackMethod` declarado solo en `@CircuitBreaker` | Declararlo en todas las anotaciones apiladas | Si el fallback se define en un aspecto interno (p. ej. `@Bulkhead`), captura la excepción y devuelve éxito al breaker exterior, que nunca contabiliza el fallo y no llega a abrir. En el breaker, el fallo lo atraviesan los aspectos internos y el breaker lo registra |
+| Breaker de la llamada entre servicios anotado en `OrganizationRestClient`, no en `LicenseService` | Anotar el método dentro de `LicenseService` | Spring AOP no intercepta auto-invocaciones (`this.metodo()`); al estar en otro bean, la llamada pasa por el proxy y el breaker sí actúa |
+| Bulkhead de tipo `SEMAPHORE` (por defecto), flujo síncrono | Bulkhead `THREADPOOL` + Time Limiter | Evita cambiar las firmas a `CompletableFuture` y tocar a los llamadores |
+| Configuración de Resilience4j en el config-server centralizado | `application.yml` local del servicio | Coherencia con la configuración centralizada del sistema |
 
 ## Dependencias con otros servicios
 
