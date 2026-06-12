@@ -40,6 +40,8 @@ el organization-service y la propagación de un identificador de correlación.
 | Spring Cloud Netflix Eureka Client | 4.x | Registro y descubrimiento de servicios |
 | Spring Cloud LoadBalancer | 4.x | Balanceo de carga del lado cliente |
 | RestClient | 6.1+ | Cliente HTTP síncrono para llamar al organization-service |
+| Spring Security 6 (OAuth2 Resource Server) | (gestionado por Spring Boot) | Validación de JWT |
+| Spring Security 6 (OAuth2 Client) | (gestionado por Spring Boot) | Token de máquina para la llamada a organization-service |
 | Spring HATEOAS | 3.3.x | Links hipermedia en las respuestas REST |
 | Spring Boot Actuator | 3.3.x | Endpoints de salud y métricas |
 | Resilience4j (`resilience4j-spring-boot3`) | 2.2.0 | Circuit breaker, retry, bulkhead, rate limiter y fallback |
@@ -74,6 +76,14 @@ la configuración remota. El resto se sirve desde el config-server en
 | `DB_USER` | `sma_user` | Usuario de la base de datos |
 | `DB_PASSWORD` | `sma_password` | Contraseña de la base de datos |
 
+### Seguridad (vía config centralizada)
+
+- `spring.security.oauth2.resourceserver.jwt.issuer-uri`: `http://keycloak:8080/realms/sma`
+  — valida los JWT entrantes contra el realm de Keycloak.
+- `spring.security.oauth2.client.registration.sma-internal` (grant `client_credentials`) y
+  `spring.security.oauth2.client.provider.keycloak.token-uri` — obtienen el token de máquina
+  usado en la llamada saliente a organization-service.
+
 ### Internacionalización
 
 Mensajes en `messages.properties` (inglés) y `messages_es.properties` (español),
@@ -91,17 +101,43 @@ trazabilidad distribuida en una etapa posterior.
 
 ## Ejecución local
 
-Requiere config-server, Eureka, PostgreSQL y el organization-service disponibles.
-Lo más simple es Docker Compose.
+Requiere config-server, Eureka, Keycloak, PostgreSQL y el organization-service
+disponibles. La vía recomendada es Docker Compose, que compila el servicio dentro de su
+imagen multi-stage (no necesitas Maven instalado en el host):
 
 ```bash
 docker compose up --build licensing-service
 ```
 
+> Opcional — solo si tienes Maven 3.9 y un JDK 21 instalados en el host (con la
+> infraestructura ya activa):
+>
+> ```bash
+> mvn clean package -pl licensing-service -am -DskipTests
+> mvn spring-boot:run -pl licensing-service
+> ```
+
 ## API
 
 Todos los endpoints aceptan el header `Accept-Language` (`en` o `es`) y, opcionalmente,
 `tmx-correlation-id`.
+
+### Autenticación y autorización
+
+Todos los endpoints requieren un access token válido en la cabecera
+`Authorization: Bearer <token>`. Sin token → `401`; con rol insuficiente → `403`.
+
+| Método | Ruta (vía gateway) | Rol | Descripción |
+|---|---|---|---|
+| GET | `/licensing/{organizationId}/license` | USER | Lista las licencias de una organización |
+| GET | `/licensing/{organizationId}/license/{licenseId}` | USER | Obtiene una licencia (enriquecida con datos de la organización) |
+| POST | `/licensing/{organizationId}/license` | ADMIN | Crea una licencia |
+| PUT | `/licensing/{organizationId}/license` | ADMIN | Actualiza una licencia |
+| DELETE | `/licensing/{organizationId}/license/{licenseId}` | ADMIN | Elimina una licencia |
+
+Ejemplo (Postman): `GET http://localhost:8072/licensing/{organizationId}/license/{licenseId}`
+con header `Authorization: Bearer <token>`. La respuesta incluye los datos reales de la
+organización (obtenidos del organization-service mediante una llamada interna autenticada).
 
 ### GET /v1/organization/{organizationId}/license/{licenseId}
 
@@ -222,6 +258,10 @@ El estado de los circuit breakers se expone vía Spring Boot Actuator:
 | Breaker de la llamada entre servicios anotado en `OrganizationRestClient`, no en `LicenseService` | Anotar el método dentro de `LicenseService` | Spring AOP no intercepta auto-invocaciones (`this.metodo()`); al estar en otro bean, la llamada pasa por el proxy y el breaker sí actúa |
 | Bulkhead de tipo `SEMAPHORE` (por defecto), flujo síncrono | Bulkhead `THREADPOOL` + Time Limiter | Evita cambiar las firmas a `CompletableFuture` y tocar a los llamadores |
 | Configuración de Resilience4j en el config-server centralizado | `application.yml` local del servicio | Coherencia con la configuración centralizada del sistema |
+| Resource server validando por `issuer-uri` | Validar solo en el gateway | Defensa en profundidad: el servicio no confía ciegamente en el borde |
+| Conversor `realm_access.roles` → `ROLE_*` | Usar `hasAuthority` sin prefijo | Permite `hasRole(...)` idiomático; Keycloak no añade el prefijo `ROLE_` |
+| Token de máquina (`client_credentials`) en la llamada interna | Relé del token del usuario | La llamada es servicio↔servicio; identidad de máquina, no de usuario |
+| Token inyectado por interceptor del RestClient | Pedir el token en cada método | Centraliza el header y corre dentro del flujo protegido por Resilience4j |
 
 ## Dependencias con otros servicios
 
@@ -230,6 +270,7 @@ El estado de los circuit breakers se expone vía Spring Boot Actuator:
 | `config-server` | Activo | Provee la configuración al arrancar |
 | `eureka-server` | Activo | Registro propio y descubrimiento del organization-service |
 | `organization-service` | Activo | Provee los datos de organización para enriquecer las licencias |
+| `keycloak` | Activo | Valida los JWT entrantes y emite el token de máquina para la llamada saliente |
 | PostgreSQL | Activo | Almacena las licencias (base `sma_licensing`) |
 
 Las siguientes se incorporarán en etapas futuras:

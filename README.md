@@ -25,13 +25,21 @@ tecnológico moderno de Spring.
 | Spring Data JPA | 3.3.x | Acceso a datos y mapeo objeto-relacional |
 | PostgreSQL | 16 | Base de datos relacional |
 | Resilience4j | 2.2.0 | Tolerancia a fallos: circuit breaker, retry, bulkhead, rate limiter y fallback |
-| Spring Security 6 + OAuth2 | 6.x | Autenticación y autorización |
+| Keycloak | 26.x | Servidor de identidad (IdP): emite y firma los JWT |
+| Spring Security 6 (OAuth2 Resource Server) | (gestionado por Spring Boot) | Validación de JWT y autorización por rol en los servicios de negocio |
+| Spring Security 6 (OAuth2 Client) | (gestionado por Spring Boot) | Token de máquina (client_credentials) para la llamada interna entre servicios |
 | Spring Cloud Stream + Kafka | 4.x | Mensajería asíncrona |
 | Micrometer Tracing + Zipkin | - | Trazabilidad distribuida |
 | Maven | 3.9.x | Construcción (monorepo multi-módulo) |
 | Docker + Docker Compose | - | Contenerización y orquestación local |
 
 ## Arquitectura del sistema
+
+Todo el tráfico externo entra por el **gateway-server** (8072), que enruta hacia los
+servicios de negocio resueltos vía Eureka. **Keycloak** actúa como servidor de identidad:
+emite los JWT que `organization-service` y `licensing-service` validan como *resource
+servers*. La comunicación interna `licensing → organization` viaja autenticada con un
+token de máquina (client_credentials).
 
 ![Arquitectura del sistema](docs/images/system.png)
 
@@ -41,10 +49,27 @@ tecnológico moderno de Spring.
 |---|---|---|
 | config-server | Configuración centralizada | 8888 |
 | eureka-server | Descubrimiento de servicios | 8761 |
+| keycloak | Servidor de identidad (IdP), emite JWT | 8080 |
 | gateway-server | Punto de entrada único y enrutado | 8072 |
-| organization-service | Gestión de organizaciones | Registrado en Eureka (sin puerto público) |
-| licensing-service | Gestión de licencias | Registrado en Eureka (sin puerto público) |
+| organization-service | Gestión de organizaciones (resource server) | Registrado en Eureka (sin puerto público) |
+| licensing-service | Gestión de licencias (resource server) | Registrado en Eureka (sin puerto público) |
 | zipkin | Trazabilidad distribuida | 9411 |
+
+## Seguridad
+
+El sistema usa OAuth2 sobre tokens JWT:
+
+- **Keycloak** (realm `sma`) emite y firma los access tokens. Roles de realm: `USER` y `ADMIN`.
+- **Resource servers**: `organization-service` y `licensing-service` validan el JWT por
+  `issuer-uri` (firma, emisor y expiración) y autorizan por rol con `@PreAuthorize`.
+  Los roles de Keycloak (`realm_access.roles`) se mapean a authorities `ROLE_*`.
+- **Comunicación interna**: la llamada `licensing → organization` se autentica con el
+  flujo `client_credentials` del cliente `sma-internal`; el token se inyecta en la
+  petición saliente y se cachea hasta su expiración.
+- **Gateway**: reenvía la cabecera `Authorization` hacia los servicios.
+
+Reglas de autorización por defecto: lecturas (GET) requieren `USER`; escrituras
+(POST/PUT/DELETE) requieren `ADMIN`.
 
 ## Ejecución del sistema completo
 
@@ -116,6 +141,6 @@ El archivo `.env` en la raíz controla la configuración del sistema. Cópialo d
 | 4 | organization-service + comunicación entre servicios | Completa |
 | 5 | Resiliencia (Resilience4j) en licensing-service | Completa |
 | 6 | gateway-server (enrutado + correlación) | Completa |
-| 7 | Seguridad (OAuth2 + JWT) | Siguiente |
-| 8 | Mensajería asíncrona (Kafka / Spring Cloud Stream) | Pendiente |
+| 7 | Seguridad (OAuth2 + JWT con Keycloak) | Completa |
+| 8 | Mensajería asíncrona (Kafka / Spring Cloud Stream) | Siguiente |
 | 9 | Trazabilidad distribuida (Micrometer + Zipkin) | Pendiente |

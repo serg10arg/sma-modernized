@@ -13,6 +13,9 @@ ser localizable por otros servicios.
 Introducido en la **Etapa 4**, cuando el sistema pasa a comportarse como una
 arquitectura distribuida real. Es el segundo servicio de negocio del sistema y el
 primero al que el licensing-service llama mediante descubrimiento de servicios.
+En la **Etapa 6** pasa a enrutarse a través del gateway-server y en la **Etapa 7**
+se asegura como *resource server* OAuth2: valida los JWT emitidos por Keycloak y
+autoriza por rol (`USER`/`ADMIN`) con `@PreAuthorize`.
 
 ## Responsabilidades
 
@@ -34,6 +37,7 @@ primero al que el licensing-service llama mediante descubrimiento de servicios.
 | Spring Cloud Netflix Eureka Client | 4.x | Registro en el servidor de descubrimiento |
 | Spring HATEOAS | 3.3.x | Soporte de links hipermedia en el modelo |
 | Spring Boot Actuator | 3.3.x | Endpoints de salud y métricas |
+| Spring Security 6 (OAuth2 Resource Server) | (gestionado por Spring Boot) | Validación de JWT |
 | PostgreSQL | 16 | Base de datos relacional (base `sma_organization`) |
 | Lombok | - | Reducción de boilerplate en el modelo |
 | Maven | 3.9.x | Herramienta de construcción |
@@ -61,6 +65,11 @@ el config-server en `config/organization-service.yml`.
 | `spring.jpa.hibernate.ddl-auto` | `none` | El esquema lo gestiona `schema.sql` |
 | `eureka.client.service-url.defaultZone` | `${EUREKA_SERVER_URI}` | URL del servidor de descubrimiento |
 
+### Seguridad (vía config centralizada)
+
+- `spring.security.oauth2.resourceserver.jwt.issuer-uri`: `http://keycloak:8080/realms/sma`
+  — valida los JWT entrantes contra el realm de Keycloak.
+
 ### Variables de entorno
 
 | Variable | Por defecto | Descripción |
@@ -75,20 +84,40 @@ el config-server en `config/organization-service.yml`.
 
 ## Ejecución local
 
-Requiere config-server, Eureka y PostgreSQL disponibles. Lo más simple es Docker Compose.
+Requiere config-server, Eureka, Keycloak y PostgreSQL disponibles. La vía recomendada
+es Docker Compose, que compila el servicio dentro de su imagen multi-stage (no necesitas
+Maven instalado en el host):
 
 ```bash
 docker compose up --build organization-service
 ```
 
-Solo el servicio con Maven (con la infraestructura ya activa):
-
-```bash
-mvn clean package -pl organization-service -am -DskipTests
-mvn spring-boot:run -pl organization-service
-```
+> Opcional — solo si tienes Maven 3.9 y un JDK 21 instalados en el host (con la
+> infraestructura ya activa):
+>
+> ```bash
+> mvn clean package -pl organization-service -am -DskipTests
+> mvn spring-boot:run -pl organization-service
+> ```
 
 ## API
+
+### Autenticación y autorización
+
+Todos los endpoints requieren `Authorization: Bearer <token>`. Sin token → `401`;
+con rol insuficiente → `403`.
+
+| Método | Ruta (vía gateway) | Rol | Descripción |
+|---|---|---|---|
+| GET | `/organization/{organizationId}` | USER | Obtiene una organización |
+| GET | `/organization-service/v1/organization` | USER | Lista todas las organizaciones |
+| POST | `/organization-service/v1/organization` | ADMIN | Crea una organización |
+| PUT | `/organization/{organizationId}` | ADMIN | Actualiza una organización |
+| DELETE | `/organization/{organizationId}` | ADMIN | Elimina una organización |
+
+> Las operaciones sobre la raíz de colección se acceden por la ruta de *discovery locator*
+> (`/organization-service/v1/organization`) por el comportamiento de *trailing-slash* de la
+> reescritura del gateway.
 
 ### GET /v1/organization/{organizationId}
 
@@ -161,6 +190,9 @@ Verifica el estado operacional del servicio.
 | Detección automática del cliente Eureka | Anotación `@EnableEurekaClient` explícita | En el stack actual la anotación es opcional; basta la dependencia en el classpath |
 | `organizationId` (String) como clave primaria | Campo numérico autogenerado | Identificador de negocio único y significativo |
 | `ddl-auto: none` + `schema.sql` | `ddl-auto: update` de Hibernate | Control explícito del esquema |
+| Resource server validando por `issuer-uri` | Validar solo en el gateway | Defensa en profundidad |
+| Conversor `realm_access.roles` → `ROLE_*` | Usar `hasAuthority` sin prefijo | Permite `hasRole(...)` idiomático |
+| Autorización por rol con `@PreAuthorize` | `@RolesAllowed` | Vía expresiva y vigente en Spring Security 6 |
 
 ## Dependencias con otros servicios
 
@@ -168,6 +200,7 @@ Verifica el estado operacional del servicio.
 |---|---|---|
 | `config-server` | Activo | Provee la configuración al arrancar |
 | `eureka-server` | Activo | Registro para ser descubierto por otros servicios |
+| `keycloak` | Activo | Valida los JWT entrantes (issuer-uri) |
 | PostgreSQL | Activo | Almacena las organizaciones |
 
 Este servicio es **consumido por** el licensing-service, que lo localiza por nombre
