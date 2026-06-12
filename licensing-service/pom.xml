@@ -94,6 +94,19 @@
             <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
 
+        <!-- Resource Server OAuth2: valida los JWT emitidos por Keycloak -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+
+        <!-- Cliente OAuth2: obtiene el token de servicio (client_credentials) para
+             propagar Authorization: Bearer en la llamada interna a organization-service -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-client</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>

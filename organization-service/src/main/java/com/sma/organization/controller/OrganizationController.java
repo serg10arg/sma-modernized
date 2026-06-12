@@ -3,6 +3,7 @@ package com.sma.organization.controller;
 import com.sma.organization.model.Organization;
 import com.sma.organization.service.OrganizationService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,6 +25,7 @@ public class OrganizationController {
     /**
      * Obtiene una organización por su id.
      */
+    @PreAuthorize("hasRole('USER')")
     @GetMapping("/{organizationId}")
     public ResponseEntity<Organization> getOrganization(@PathVariable String organizationId) {
         return ResponseEntity.ok(organizationService.getOrganization(organizationId));
@@ -32,6 +34,7 @@ public class OrganizationController {
     /**
      * Lista todas las organizaciones.
      */
+    @PreAuthorize("hasRole('USER')")
     @GetMapping
     public ResponseEntity<List<Organization>> getAllOrganizations() {
         return ResponseEntity.ok(organizationService.getAllOrganizations());
@@ -40,6 +43,7 @@ public class OrganizationController {
     /**
      * Crea una nueva organización.
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<Organization> createOrganization(@RequestBody Organization organization) {
         return ResponseEntity.ok(organizationService.createOrganization(organization));
@@ -48,6 +52,7 @@ public class OrganizationController {
     /**
      * Actualiza una organización existente.
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{organizationId}")
     public ResponseEntity<Organization> updateOrganization(
             @PathVariable String organizationId,
@@ -59,6 +64,7 @@ public class OrganizationController {
     /**
      * Elimina una organización.
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{organizationId}")
     public ResponseEntity<Void> deleteOrganization(@PathVariable String organizationId) {
         organizationService.deleteOrganization(organizationId);

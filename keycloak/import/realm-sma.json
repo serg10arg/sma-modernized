@@ -1,0 +1,59 @@
+{
+  "realm": "sma",
+  "enabled": true,
+  "sslRequired": "none",
+  "roles": {
+    "realm": [
+      { "name": "USER",  "description": "Usuario estandar del sistema" },
+      { "name": "ADMIN", "description": "Administrador del sistema" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "sma-web",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["http://localhost:8072/*", "http://keycloak:8080/*"],
+      "webOrigins": ["*"]
+    },
+    {
+      "clientId": "sma-internal",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "sma-internal-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true
+    }
+  ],
+  "users": [
+    {
+      "username": "illary.huaylupo",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "illary.huaylupo@sma.local",
+      "firstName": "Illary",
+      "lastName": "Huaylupo",
+      "credentials": [ { "type": "password", "value": "password", "temporary": false } ],
+      "realmRoles": ["USER", "ADMIN"]
+    },
+    {
+      "username": "john.carnell",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "john.carnell@sma.local",
+      "firstName": "John",
+      "lastName": "Carnell",
+      "credentials": [ { "type": "password", "value": "password", "temporary": false } ],
+      "realmRoles": ["USER"]
+    },
+    {
+      "username": "service-account-sma-internal",
+      "enabled": true,
+      "serviceAccountClientId": "sma-internal",
+      "realmRoles": ["USER"]
+    }
+  ]
+}

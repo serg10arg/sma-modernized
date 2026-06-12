@@ -18,6 +18,12 @@ spring:
   sql:
     init:
       mode: always
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # El JwtDecoder resuelve el discovery del realm al arrancar -> Keycloak debe estar healthy
+          issuer-uri: http://keycloak:8080/realms/sma
 
 eureka:
   client:

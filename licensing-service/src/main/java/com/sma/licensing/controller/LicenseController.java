@@ -3,6 +3,7 @@ package com.sma.licensing.controller;
 import com.sma.licensing.model.License;
 import com.sma.licensing.service.LicenseService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -29,6 +30,7 @@ public class LicenseController {
     /**
      * Obtiene una licencia específica de una organización, con links HATEOAS.
      */
+    @PreAuthorize("hasRole('USER')")
     @GetMapping("/{licenseId}")
     public ResponseEntity<License> getLicense(
             @PathVariable String organizationId,
@@ -58,6 +60,7 @@ public class LicenseController {
     /**
      * Lista todas las licencias de una organización.
      */
+    @PreAuthorize("hasRole('USER')")
     @GetMapping
     public ResponseEntity<List<License>> getLicenses(@PathVariable String organizationId) {
         return ResponseEntity.ok(licenseService.getLicensesByOrganization(organizationId));
@@ -66,6 +69,7 @@ public class LicenseController {
     /**
      * Crea una nueva licencia para una organización.
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<String> createLicense(
             @PathVariable String organizationId,
@@ -79,6 +83,7 @@ public class LicenseController {
     /**
      * Actualiza una licencia existente de una organización.
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping
     public ResponseEntity<String> updateLicense(
             @PathVariable String organizationId,
@@ -92,6 +97,7 @@ public class LicenseController {
     /**
      * Elimina una licencia de una organización.
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{licenseId}")
     public ResponseEntity<String> deleteLicense(
             @PathVariable String organizationId,

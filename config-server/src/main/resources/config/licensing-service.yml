@@ -22,6 +22,23 @@ spring:
     init:
       # Ejecuta schema.sql y data.sql al arrancar
       mode: always
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # El JwtDecoder resuelve el discovery del realm al arrancar -> Keycloak debe estar healthy
+          issuer-uri: http://keycloak:8080/realms/sma
+      # Cliente OAuth2 (7c): credenciales de servicio para la llamada interna a organization-service
+      client:
+        registration:
+          sma-internal:
+            authorization-grant-type: client_credentials
+            client-id: sma-internal
+            client-secret: sma-internal-secret
+            provider: keycloak
+        provider:
+          keycloak:
+            token-uri: http://keycloak:8080/realms/sma/protocol/openid-connect/token
 
 eureka:
   client:
