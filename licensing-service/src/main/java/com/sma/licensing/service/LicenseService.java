@@ -1,6 +1,5 @@
 package com.sma.licensing.service;
 
-import com.sma.licensing.client.OrganizationRestClient;
 import com.sma.licensing.exception.LicenseNotFoundException;
 import com.sma.licensing.model.License;
 import com.sma.licensing.model.Organization;
@@ -32,15 +31,15 @@ public class LicenseService {
     // Repositorio de acceso a datos de licencias
     private final LicenseRepository licenseRepository;
 
-    // Cliente del organization-service (descubierto por nombre en Eureka)
-    private final OrganizationRestClient organizationRestClient;
+    // Wrapper cache-aside del organization-service (Redis + circuit breaker/retry)
+    private final OrganizationCacheService organizationCacheService;
 
     public LicenseService(MessageSource messages,
                           LicenseRepository licenseRepository,
-                          OrganizationRestClient organizationRestClient) {
+                          OrganizationCacheService organizationCacheService) {
         this.messages = messages;
         this.licenseRepository = licenseRepository;
-        this.organizationRestClient = organizationRestClient;
+        this.organizationCacheService = organizationCacheService;
     }
 
     /**
@@ -57,9 +56,9 @@ public class LicenseService {
                                 new Object[]{licenseId, organizationId},
                                 locale)));
 
-        // Enriquecimiento: consulta el organization-service por descubrimiento.
-        // Si el servicio remoto falla, la excepción se propaga (Etapa 5 añadirá resiliencia).
-        Organization organization = organizationRestClient.getOrganization(organizationId);
+        // Enriquecimiento vía cache-aside: HIT en Redis o MISS -> organization-service
+        // (que conserva su circuit breaker/retry). El fallback nunca se cachea.
+        Organization organization = organizationCacheService.getOrganization(organizationId);
         license.setOrganization(organization);
 
         return license;

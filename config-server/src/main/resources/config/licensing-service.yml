@@ -74,6 +74,14 @@ management:
   health:
     circuitbreakers:
       enabled: true
+    # La caché es no crítica por diseño: un Redis caído no debe poner el servicio en DOWN
+    redis:
+      enabled: false
+
+# Nivel DEBUG del servicio: muestra los logs de cache-aside (HIT/MISS)
+logging:
+  level:
+    com.sma.licensing: DEBUG
 
 # --- Resilience4j (Etapa 5) ---
 resilience4j.circuitbreaker:

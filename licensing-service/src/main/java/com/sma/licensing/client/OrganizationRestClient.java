@@ -14,6 +14,9 @@ import org.springframework.web.client.RestClient;
 @Component
 public class OrganizationRestClient {
 
+    /** Nombre sentinel del fallback. Lo usa la capa de caché para NO cachearlo. */
+    public static final String FALLBACK_ORG_NAME = "Organización no disponible temporalmente";
+
     private final RestClient organizationRestClient;
 
     public OrganizationRestClient(RestClient organizationRestClient) {
@@ -41,7 +44,7 @@ public class OrganizationRestClient {
     private Organization buildFallbackOrganization(String organizationId, Throwable t) {
         Organization org = new Organization();
         org.setOrganizationId(organizationId);
-        org.setName("Organización no disponible temporalmente");
+        org.setName(FALLBACK_ORG_NAME);
         return org;
     }
 }
