@@ -2,206 +2,117 @@
 
 ## Descripción
 
-Microservicio de gestión de organizaciones del sistema sma-modernized. Expone una
-API REST para consultar, crear, actualizar y eliminar organizaciones. Persiste los
-datos en su propia base de datos PostgreSQL, obtiene su configuración del servidor
-de configuración centralizada y se registra en el servidor de descubrimiento para
-ser localizable por otros servicios.
+Microservicio de gestión de organizaciones. Expone una API REST para operaciones
+CRUD sobre organizaciones y las persiste en su propia base de datos. Cada vez que
+una organización se crea, actualiza o elimina, publica un evento de cambio en
+Kafka para que otros servicios (como el `licensing-service`) reaccionen, por
+ejemplo invalidando su caché.
 
 ## Etapa
 
-Introducido en la **Etapa 4**, cuando el sistema pasa a comportarse como una
-arquitectura distribuida real. Es el segundo servicio de negocio del sistema y el
-primero al que el licensing-service llama mediante descubrimiento de servicios.
-En la **Etapa 6** pasa a enrutarse a través del gateway-server y en la **Etapa 7**
-se asegura como *resource server* OAuth2: valida los JWT emitidos por Keycloak y
-autoriza por rol (`USER`/`ADMIN`) con `@PreAuthorize`.
+Introducido en la **Etapa 4**. Ampliado en etapas posteriores:
+
+- **Etapa 7:** seguridad OAuth2 + JWT como *resource server*.
+- **Etapa 8:** productor de eventos de cambio de organización en Kafka.
 
 ## Responsabilidades
 
-- Exponer los endpoints REST CRUD de organizaciones
-- Persistir las organizaciones en su propia base de datos PostgreSQL
-- Registrarse en el servidor de descubrimiento (Eureka) para ser localizable por nombre
-- Obtener su configuración del config-server al arrancar
-- Publicar el endpoint de salud `/actuator/health` para verificación operacional
+- CRUD de organizaciones bajo `/v1/organization`.
+- Persistir las organizaciones en la base `sma_organization` (PostgreSQL).
+- Registrarse en Eureka para ser descubierto por otros servicios.
+- Publicar un evento `OrganizationChangeModel` (`CREATED` / `UPDATED` / `DELETED`)
+  en Kafka tras cada mutación, mediante `StreamBridge`.
+- Validar el token JWT y autorizar por rol como *resource server* OAuth2.
 
 ## Tecnologías
 
-| Tecnología | Versión | Rol |
-|---|---|---|
-| Java | 21 | Lenguaje principal |
-| Spring Boot | 3.3.x | Framework base del microservicio |
-| Spring Web (Tomcat) | 3.3.x | Servidor HTTP embebido y capa REST |
-| Spring Data JPA | 3.3.x | Acceso a datos y mapeo objeto-relacional |
-| Spring Cloud Config Client | 4.x | Lectura de configuración centralizada |
-| Spring Cloud Netflix Eureka Client | 4.x | Registro en el servidor de descubrimiento |
-| Spring HATEOAS | 3.3.x | Soporte de links hipermedia en el modelo |
-| Spring Boot Actuator | 3.3.x | Endpoints de salud y métricas |
-| Spring Security 6 (OAuth2 Resource Server) | (gestionado por Spring Boot) | Validación de JWT |
-| PostgreSQL | 16 | Base de datos relacional (base `sma_organization`) |
-| Lombok | - | Reducción de boilerplate en el modelo |
-| Maven | 3.9.x | Herramienta de construcción |
-| Docker | - | Contenerización del servicio |
+- Java 21, Spring Boot 3.3.x
+- Spring Web (REST) y Spring Data JPA + PostgreSQL
+- Spring Cloud Config Client (`spring.config.import`) y Eureka Client
+- Spring Cloud Stream + binder de Kafka (productor, vía `StreamBridge`)
+- Spring Security 6 + OAuth2 Resource Server (JWT)
 
 ## Configuración
 
-El `application.yml` local contiene solo el nombre del servicio y la importación de
-la configuración remota. El resto (puerto, datasource, JPA, Eureka) se sirve desde
-el config-server en `config/organization-service.yml`.
+La configuración se obtiene del `config-server` mediante `spring.config.import`.
+Propiedades relevantes:
 
-### Configuración local (`application.yml`)
-
-| Propiedad | Valor | Descripción |
-|---|---|---|
-| `spring.application.name` | `organization-service` | Nombre lógico; con él se registra en Eureka y solicita su config |
-| `spring.config.import` | `configserver:${CONFIG_SERVER_URI:http://localhost:8888}` | URI del config-server |
-
-### Configuración centralizada (servida por el config-server)
-
-| Propiedad | Valor | Descripción |
-|---|---|---|
-| `server.port` | `8081` | Puerto del servidor HTTP |
-| `spring.datasource.url` | `jdbc:postgresql://${DB_HOST}:${DB_PORT}/${ORG_DB_NAME}` | Conexión a la base `sma_organization` |
-| `spring.jpa.hibernate.ddl-auto` | `none` | El esquema lo gestiona `schema.sql` |
-| `eureka.client.service-url.defaultZone` | `${EUREKA_SERVER_URI}` | URL del servidor de descubrimiento |
-
-### Seguridad (vía config centralizada)
-
-- `spring.security.oauth2.resourceserver.jwt.issuer-uri`: `http://keycloak:8080/realms/sma`
-  — valida los JWT entrantes contra el realm de Keycloak.
-
-### Variables de entorno
-
-| Variable | Por defecto | Descripción |
-|---|---|---|
-| `CONFIG_SERVER_URI` | `http://localhost:8888` | URI del servidor de configuración |
-| `EUREKA_SERVER_URI` | `http://localhost:8761/eureka/` | URI del servidor de descubrimiento |
-| `DB_HOST` | `localhost` | Host de PostgreSQL |
-| `DB_PORT` | `5432` | Puerto de PostgreSQL |
-| `ORG_DB_NAME` | `sma_organization` | Nombre de la base de datos |
-| `ORG_DB_USER` | `sma_user` | Usuario de la base de datos |
-| `ORG_DB_PASSWORD` | `sma_password` | Contraseña de la base de datos |
+| Propiedad | Descripción |
+|---|---|
+| `spring.datasource.*` | Conexión a la base `sma_organization` (PostgreSQL). `ddl-auto: none` + `schema.sql` |
+| `eureka.client.*` | Registro en el `eureka-server` |
+| `spring.cloud.stream.bindings.organizationChange-out-0` | Binding de salida hacia el topic `sma.organization.changes` |
+| `spring.cloud.stream.kafka.binder.brokers` | `kafka:9092` |
+| `spring.security.oauth2.resourceserver.jwt.issuer-uri` | `http://keycloak:8080/realms/sma` |
 
 ## Ejecución local
 
-Requiere config-server, Eureka, Keycloak y PostgreSQL disponibles. La vía recomendada
-es Docker Compose, que compila el servicio dentro de su imagen multi-stage (no necesitas
-Maven instalado en el host):
-
-```bash
-docker compose up --build organization-service
-```
-
-> Opcional — solo si tienes Maven 3.9 y un JDK 21 instalados en el host (con la
-> infraestructura ya activa):
->
-> ```bash
-> mvn clean package -pl organization-service -am -DskipTests
-> mvn spring-boot:run -pl organization-service
-> ```
+- **Con Maven:** `mvn spring-boot:run -pl organization-service` (requiere el resto
+  de la pila disponible; en la práctica se levanta con Docker Compose).
+- **Con Docker:** forma parte de `docker compose up`. No expone puerto público: se
+  accede a través del `gateway-server` en el puerto `8072`.
 
 ## API
 
-### Autenticación y autorización
+Base (a través del gateway, por ruta de descubrimiento):
+`http://localhost:8072/organization-service/v1/organization`
 
-Todos los endpoints requieren `Authorization: Bearer <token>`. Sin token → `401`;
-con rol insuficiente → `403`.
+Todas las llamadas requieren `Authorization: Bearer {JWT}`.
 
-| Método | Ruta (vía gateway) | Rol | Descripción |
-|---|---|---|---|
-| GET | `/organization/{organizationId}` | USER | Obtiene una organización |
-| GET | `/organization-service/v1/organization` | USER | Lista todas las organizaciones |
-| POST | `/organization-service/v1/organization` | ADMIN | Crea una organización |
-| PUT | `/organization/{organizationId}` | ADMIN | Actualiza una organización |
-| DELETE | `/organization/{organizationId}` | ADMIN | Elimina una organización |
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/{organizationId}` | Obtiene una organización por su id |
+| POST | `/` | Crea una nueva organización (publica evento `CREATED`) |
+| PUT | `/{organizationId}` | Actualiza una organización (publica evento `UPDATED`) |
+| DELETE | `/{organizationId}` | Elimina una organización (publica evento `DELETED`) |
 
-> Las operaciones sobre la raíz de colección se acceden por la ruta de *discovery locator*
-> (`/organization-service/v1/organization`) por el comportamiento de *trailing-slash* de la
-> reescritura del gateway.
+> **Nota sobre el enrutado:** la ruta de colección con barra final
+> (`/organization/`) tiene una limitación conocida en el gateway. Para crear y
+> listar organizaciones se utiliza la ruta de descubrimiento
+> `/organization-service/v1/organization`.
 
-### GET /v1/organization/{organizationId}
+**Ejemplo — crear una organización:**
 
-Obtiene una organización por su id. Devuelve HTTP 404 si no existe.
+Request:
 
-**Response (HTTP 200):**
+```
+POST http://localhost:8072/organization-service/v1/organization
+Authorization: Bearer eyJhbGciOiJSUzI1NiI...
+Content-Type: application/json
 
-```json
 {
-  "organizationId": "org-001",
-  "name": "Organización de prueba",
-  "contactName": "Ana Contacto",
-  "contactEmail": "ana@ejemplo.com",
+  "organizationId": "be1cd947-...",
+  "name": "ACME",
+  "contactName": "Jane Doe",
+  "contactEmail": "jane@acme.com",
   "contactPhone": "600000000"
 }
 ```
 
----
-
-### GET /v1/organization
-
-Lista todas las organizaciones.
-
----
-
-### POST /v1/organization
-
-Crea una nueva organización. Asigna un `organizationId` aleatorio.
-
-**Request:**
-
-```json
-{
-  "name": "Nueva organización",
-  "contactName": "Juan Pérez",
-  "contactEmail": "juan@ejemplo.com",
-  "contactPhone": "611111111"
-}
-```
-
-**Response (HTTP 200):** la organización creada, con su `organizationId` asignado.
-
----
-
-### PUT /v1/organization/{organizationId}
-
-Actualiza una organización existente.
-
----
-
-### DELETE /v1/organization/{organizationId}
-
-Elimina una organización. Devuelve HTTP 204 si tiene éxito, 404 si no existe.
-
----
-
-### GET /actuator/health
-
-Verifica el estado operacional del servicio.
-
-```json
-{ "status": "UP" }
-```
+Tras la respuesta `200 OK`, el servicio publica en `sma.organization.changes` un
+evento con `action = CREATED` y el `organizationId` correspondiente.
 
 ## Decisiones técnicas
 
 | Decisión tomada | Alternativas consideradas | Motivo de la elección |
 |---|---|---|
-| Base de datos propia (`sma_organization`) | Compartir base con licensing-service | Aísla los datos de cada servicio; cada microservicio es dueño de su propia base |
-| Detección automática del cliente Eureka | Anotación `@EnableEurekaClient` explícita | En el stack actual la anotación es opcional; basta la dependencia en el classpath |
-| `organizationId` (String) como clave primaria | Campo numérico autogenerado | Identificador de negocio único y significativo |
-| `ddl-auto: none` + `schema.sql` | `ddl-auto: update` de Hibernate | Control explícito del esquema |
-| Resource server validando por `issuer-uri` | Validar solo en el gateway | Defensa en profundidad |
-| Conversor `realm_access.roles` → `ROLE_*` | Usar `hasAuthority` sin prefijo | Permite `hasRole(...)` idiomático |
-| Autorización por rol con `@PreAuthorize` | `@RolesAllowed` | Vía expresiva y vigente en Spring Security 6 |
+| Base de datos propia `sma_organization` | Compartir base con `licensing-service` | Aislamiento de datos por servicio (cada microservicio es dueño de sus datos) |
+| Un único contenedor PostgreSQL con dos bases | Dos contenedores PostgreSQL | Simplicidad operativa, manteniendo bases separadas por servicio |
+| `StreamBridge` para publicar los eventos | Binding de salida declarativo con `Supplier` | Publicación imperativa justo tras la mutación de dominio, más natural para eventos disparados por acción |
+| `record OrganizationChangeModel` + `enum ActionEnum` | Clase POJO mutable | Inmutabilidad y concisión del modelo de evento |
+| `spring.config.import` para el Config Client | `bootstrap.yml` | `bootstrap.yml` está obsoleto en Spring Boot 3.x |
 
 ## Dependencias con otros servicios
 
-| Servicio | Estado | Motivo |
-|---|---|---|
-| `config-server` | Activo | Provee la configuración al arrancar |
-| `eureka-server` | Activo | Registro para ser descubierto por otros servicios |
-| `keycloak` | Activo | Valida los JWT entrantes (issuer-uri) |
-| PostgreSQL | Activo | Almacena las organizaciones |
+- `config-server` — configuración centralizada.
+- `eureka-server` — descubrimiento de servicios.
+- PostgreSQL — base de datos `sma_organization`.
+- Kafka — publicación de eventos de cambio (topic `sma.organization.changes`).
+- Keycloak — validación del token JWT.
+- `gateway-server` — entrada única al sistema.
 
-Este servicio es **consumido por** el licensing-service, que lo localiza por nombre
-a través de Eureka para enriquecer las licencias con datos de organización.
+## Limitaciones conocidas
+
+- Los eventos publicados llevan el `correlationId` a `null`: este servicio aún no
+  lee ni reemite el header `tmx-correlation-id`. Se resolverá en la etapa de
+  trazabilidad distribuida (Etapa 9).

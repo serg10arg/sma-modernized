@@ -2,103 +2,79 @@
 
 ## Descripción del proyecto
 
-Sistema de gestión de licencias y organizaciones construido con arquitectura
-de microservicios usando Spring Boot y Spring Cloud.
-
-El proyecto moderniza una aplicación monolítica de gestión de activos de software
-(O-stock) descomponiéndola en servicios independientes, desplegables de forma
-autónoma y diseñados siguiendo los principios cloud-native y la metodología
-twelve-factor app. Se construye de forma incremental por etapas con el stack
-tecnológico moderno de Spring.
+Sistema de gestión de licencias y organizaciones construido con arquitectura de
+microservicios usando Spring Boot y Spring Cloud. El sistema se desarrolla de
+forma incremental por etapas, aplicando buenas prácticas cloud-native con el stack
+moderno de Spring: configuración centralizada, descubrimiento de servicios,
+puerta de enlace única, tolerancia a fallos, seguridad OAuth2/JWT, mensajería
+asíncrona y caché distribuida.
 
 ## Stack tecnológico
 
-| Tecnología | Versión | Rol dentro del sistema |
+| Tecnología | Versión | Rol en el sistema |
 |---|---|---|
-| Java | 21 | Lenguaje principal |
-| Spring Boot | 3.3.x | Framework base de todos los servicios |
-| Spring Cloud | 2023.x | Suite de patrones cloud-native |
-| Spring Cloud Config | 4.x | Configuración centralizada |
-| Spring Cloud Netflix Eureka | 4.x | Registro y descubrimiento de servicios |
-| Spring Cloud Gateway | 4.x | Enrutamiento centralizado (API Gateway) |
-| Spring Cloud LoadBalancer | 4.x | Balanceo de carga del lado cliente |
-| Spring Data JPA | 3.3.x | Acceso a datos y mapeo objeto-relacional |
-| PostgreSQL | 16 | Base de datos relacional |
-| Resilience4j | 2.2.0 | Tolerancia a fallos: circuit breaker, retry, bulkhead, rate limiter y fallback |
-| Keycloak | 26.x | Servidor de identidad (IdP): emite y firma los JWT |
-| Spring Security 6 (OAuth2 Resource Server) | (gestionado por Spring Boot) | Validación de JWT y autorización por rol en los servicios de negocio |
-| Spring Security 6 (OAuth2 Client) | (gestionado por Spring Boot) | Token de máquina (client_credentials) para la llamada interna entre servicios |
-| Spring Cloud Stream + Kafka | 4.x | Mensajería asíncrona |
-| Micrometer Tracing + Zipkin | - | Trazabilidad distribuida |
-| Maven | 3.9.x | Construcción (monorepo multi-módulo) |
-| Docker + Docker Compose | - | Contenerización y orquestación local |
+| Java | 21 | Lenguaje base |
+| Spring Boot | 3.3.x | Framework de los microservicios |
+| Spring Cloud | 2023.x | Soporte para arquitectura de microservicios |
+| Spring Cloud Config | 2023.x | Configuración centralizada |
+| Spring Cloud Netflix Eureka | 2023.x | Descubrimiento de servicios |
+| Spring Cloud Gateway | 2023.x | Entrada única y enrutado |
+| Spring Cloud LoadBalancer | 2023.x | Balanceo por descubrimiento |
+| Resilience4j | — | Tolerancia a fallos (circuit breaker, retry, bulkhead, rate limiter) |
+| Spring Cloud Stream | 2023.x | Abstracción de mensajería |
+| Apache Kafka | 4.2.0 (KRaft) | Broker de mensajería asíncrona |
+| Spring Data Redis / Redis | 7 | Caché distribuida |
+| Spring Security + OAuth2 | 6 | Seguridad de los servicios |
+| Keycloak | — | Servidor de identidad (OAuth2/JWT) |
+| Micrometer Tracing + Zipkin | — | Trazabilidad distribuida (en preparación, Etapa 9) |
+| PostgreSQL | — | Persistencia relacional |
+| Maven | — | Construcción (monorepo multi-módulo) |
+| Docker + Docker Compose | — | Orquestación local |
 
 ## Arquitectura del sistema
 
-Todo el tráfico externo entra por el **gateway-server** (8072), que enruta hacia los
-servicios de negocio resueltos vía Eureka. **Keycloak** actúa como servidor de identidad:
-emite los JWT que `organization-service` y `licensing-service` validan como *resource
-servers*. La comunicación interna `licensing → organization` viaja autenticada con un
-token de máquina (client_credentials).
+![Arquitectura del sistema sma-modernized](docs/images/system.png)
 
-![Arquitectura del sistema](docs/images/system.png)
+Los clientes acceden al sistema exclusivamente a través del `gateway-server`
+(puerto `8072`), que enruta hacia los servicios de negocio descubiertos en Eureka.
+Los servicios obtienen su configuración del `config-server`, validan los tokens
+JWT emitidos por Keycloak, se comunican de forma síncrona (REST con balanceo por
+descubrimiento) y asíncrona (eventos en Kafka), y emplean Redis como caché
+distribuida.
 
 ## Servicios
 
 | Servicio | Descripción | Puerto |
 |---|---|---|
-| config-server | Configuración centralizada | 8888 |
-| eureka-server | Descubrimiento de servicios | 8761 |
-| keycloak | Servidor de identidad (IdP), emite JWT | 8080 |
-| gateway-server | Punto de entrada único y enrutado | 8072 |
-| organization-service | Gestión de organizaciones (resource server) | Registrado en Eureka (sin puerto público) |
-| licensing-service | Gestión de licencias (resource server) | Registrado en Eureka (sin puerto público) |
-| zipkin | Trazabilidad distribuida | 9411 |
-
-## Seguridad
-
-El sistema usa OAuth2 sobre tokens JWT:
-
-- **Keycloak** (realm `sma`) emite y firma los access tokens. Roles de realm: `USER` y `ADMIN`.
-- **Resource servers**: `organization-service` y `licensing-service` validan el JWT por
-  `issuer-uri` (firma, emisor y expiración) y autorizan por rol con `@PreAuthorize`.
-  Los roles de Keycloak (`realm_access.roles`) se mapean a authorities `ROLE_*`.
-- **Comunicación interna**: la llamada `licensing → organization` se autentica con el
-  flujo `client_credentials` del cliente `sma-internal`; el token se inyecta en la
-  petición saliente y se cachea hasta su expiración.
-- **Gateway**: reenvía la cabecera `Authorization` hacia los servicios.
-
-Reglas de autorización por defecto: lecturas (GET) requieren `USER`; escrituras
-(POST/PUT/DELETE) requieren `ADMIN`.
+| `config-server` | Configuración centralizada | `8888` |
+| `eureka-server` | Descubrimiento de servicios | `8761` |
+| `gateway-server` | Entrada única y enrutado | `8072` |
+| `keycloak` | Servidor de identidad OAuth2/JWT | `8080` |
+| `zipkin` | Trazabilidad distribuida | `9411` |
+| `postgres` | Base de datos (`sma_licensing`, `sma_organization`) | `5432` |
+| `kafka` | Broker de mensajería (KRaft) | `9092` (interno) |
+| `redis` | Caché distribuida | `6379` (interno) |
+| `organization-service` | Gestión de organizaciones | Sin puerto público (vía Eureka / gateway) |
+| `licensing-service` | Gestión de licencias | Sin puerto público (vía Eureka / gateway) |
 
 ## Ejecución del sistema completo
 
-**Prerequisitos:**
-
-- Docker y Docker Compose instalados
-- Git
-- (Opcional para desarrollo) Java 21 y Maven 3.9.x
-
-**Pasos:**
+**Prerrequisitos:** Docker y Docker Compose instalados.
 
 ```bash
-# 1. Clonar el repositorio
-git clone https://github.com/<tu-usuario>/sma-modernized.git
-cd sma-modernized
-
-# 2. Crear el archivo de variables de entorno
+# 1. Crear el archivo de variables de entorno
 cp .env.example .env
 # Editar .env con los valores apropiados para tu entorno
 
-# 3. Levantar todo el sistema
+# 2. Levantar todo el sistema
 docker compose up --build
 
-# 4. Verificar que los servicios están en pie
+# 3. Verificar que los servicios están en pie
 docker compose ps
 ```
 
-**Verificar el registro de servicios** en el dashboard de Eureka:
-`http://localhost:8761`
+El acceso a la API se hace siempre por el gateway en `http://localhost:8072`,
+con un token OAuth2 obtenido de Keycloak (realm `sma`).
 
 **Detener el sistema:**
 
@@ -106,41 +82,36 @@ docker compose ps
 docker compose down
 ```
 
-> Nota: la primera vez que se levanta el sistema, el contenedor de PostgreSQL crea
-> las dos bases de datos mediante un script de inicialización. Si se necesita
-> recrear ese script (por ejemplo, tras cambiarlo), hay que recrear el volumen con
-> `docker compose down -v`, lo que borra los datos almacenados.
-
 ## Variables de entorno
 
 El archivo `.env` en la raíz controla la configuración del sistema. Cópialo desde
-`.env.example` y ajusta los valores.
+`.env.example` y ajusta los valores según tu entorno.
 
 | Variable | Descripción | Valor de ejemplo |
 |---|---|---|
-| `CONFIG_SERVER_URI` | URL del config-server para los servicios cliente | `http://config-server:8888` |
-| `EUREKA_SERVER_URI` | URL del eureka-server para el registro de servicios | `http://eureka-server:8761/eureka/` |
-| `ZIPKIN_URI` | URL del servidor Zipkin para trazabilidad | `http://zipkin:9411` |
+| `SPRING_PROFILES_ACTIVE` | Perfil de Spring activo en los servicios | `default` |
+| `CONFIG_SERVER_URI` | URL del `config-server` para los clientes | `http://config-server:8888` |
+| `EUREKA_SERVER_URI` | URL del `eureka-server` para el registro | `http://eureka-server:8761/eureka` |
+| `ZIPKIN_URI` | URL del servidor Zipkin | `http://zipkin:9411` |
 | `DB_HOST` | Host de PostgreSQL | `postgres` |
 | `DB_PORT` | Puerto de PostgreSQL | `5432` |
-| `DB_NAME` | Base de datos del licensing-service | `sma_licensing` |
 | `DB_USER` | Usuario de la base de datos | `sma_user` |
-| `DB_PASSWORD` | Contraseña de la base de datos | `sma_password` |
-| `ORG_DB_NAME` | Base de datos del organization-service | `sma_organization` |
-| `ORG_DB_USER` | Usuario de la base de datos de organización | `sma_user` |
-| `ORG_DB_PASSWORD` | Contraseña de la base de datos de organización | `sma_password` |
+| `DB_PASSWORD` | Contraseña de la base de datos | `changeme` |
+| `REDIS_HOST` | Host de Redis | `redis` |
+| `REDIS_PORT` | Puerto de Redis | `6379` |
 
 ## Estado del proyecto
 
 | Etapa | Descripción | Estado |
 |---|---|---|
-| 0 | Esqueleto monorepo | Completa |
-| 1 | config-server + eureka-server | Completa |
-| 2 | licensing-service (REST, i18n, HATEOAS) + Docker | Completa |
-| 3 | Persistencia PostgreSQL (licensing-service) | Completa |
-| 4 | organization-service + comunicación entre servicios | Completa |
-| 5 | Resiliencia (Resilience4j) en licensing-service | Completa |
-| 6 | gateway-server (enrutado + correlación) | Completa |
-| 7 | Seguridad (OAuth2 + JWT con Keycloak) | Completa |
-| 8 | Mensajería asíncrona (Kafka / Spring Cloud Stream) | Siguiente |
-| 9 | Trazabilidad distribuida (Micrometer + Zipkin) | Pendiente |
+| Paso 0 | Inicialización del monorepo | ✅ Completada |
+| Etapa 1 | `config-server` + `eureka-server` | ✅ Completada |
+| Etapa 2 / 2b | `licensing-service`: REST + i18n + HATEOAS + capa Docker | ✅ Completada |
+| Etapa 3 | Persistencia con PostgreSQL y Spring Data JPA | ✅ Completada |
+| Etapa 4 | `organization-service` + comunicación entre servicios + correlationId | ✅ Completada |
+| Etapa 5 | Resilience4j: circuit breaker, retry, bulkhead, rate limiter | ✅ Completada |
+| Etapa 6 | `gateway-server`: rutas, pre-filter y post-filter | ✅ Completada |
+| Etapa 7 | Seguridad OAuth2 + JWT con Keycloak | ✅ Completada |
+| Etapa 8 | Mensajería asíncrona con Kafka + caché con Redis | ✅ Completada |
+| Etapa 9 | Trazabilidad distribuida con Micrometer + Zipkin | 🔜 Pendiente |
+| Posteriores | Observabilidad (ELK, Prometheus/Grafana) y despliegue en cloud | ⏸️ Fuera del alcance actual |
