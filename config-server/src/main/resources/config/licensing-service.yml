@@ -39,6 +39,18 @@ spring:
         provider:
           keycloak:
             token-uri: http://keycloak:8080/realms/sma/protocol/openid-connect/token
+  cloud:
+    function:
+      definition: organizationChange
+    stream:
+      kafka:
+        binder:
+          brokers: kafka:9092
+      bindings:
+        organizationChange-in-0:
+          destination: sma.organization.changes
+          group: licensing-group
+          content-type: application/json
 
 eureka:
   client:
