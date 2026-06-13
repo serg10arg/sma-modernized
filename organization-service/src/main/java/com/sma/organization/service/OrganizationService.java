@@ -1,8 +1,11 @@
 package com.sma.organization.service;
 
+import com.sma.organization.event.ActionEnum;
+import com.sma.organization.event.OrganizationChangeModel;
 import com.sma.organization.exception.OrganizationNotFoundException;
 import com.sma.organization.model.Organization;
 import com.sma.organization.repository.OrganizationRepository;
+import org.springframework.cloud.stream.function.StreamBridge;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -10,15 +13,21 @@ import java.util.UUID;
 
 /**
  * Servicio de negocio para la gestión de organizaciones.
- * Persiste los datos en PostgreSQL a través de OrganizationRepository.
+ * Persiste los datos en PostgreSQL y publica un evento de cambio en Kafka
+ * tras cada operación de creación, actualización o borrado.
  */
 @Service
 public class OrganizationService {
 
-    private final OrganizationRepository repository;
+    // Nombre del binding de salida; debe coincidir con la config de Spring Cloud Stream
+    private static final String OUTPUT_BINDING = "organizationChange-out-0";
 
-    public OrganizationService(OrganizationRepository repository) {
+    private final OrganizationRepository repository;
+    private final StreamBridge streamBridge;
+
+    public OrganizationService(OrganizationRepository repository, StreamBridge streamBridge) {
         this.repository = repository;
+        this.streamBridge = streamBridge;
     }
 
     /**
@@ -38,25 +47,39 @@ public class OrganizationService {
     }
 
     /**
-     * Crea y persiste una nueva organización con un id aleatorio.
+     * Crea y persiste una nueva organización con un id aleatorio, y publica un evento CREATED.
      */
     public Organization createOrganization(Organization organization) {
         organization.setOrganizationId(UUID.randomUUID().toString());
-        return repository.save(organization);
+        Organization saved = repository.save(organization);
+        publishChange(ActionEnum.CREATED, saved.getOrganizationId());
+        return saved;
     }
 
     /**
-     * Actualiza una organización existente.
+     * Actualiza una organización existente y publica un evento UPDATED.
      */
     public Organization updateOrganization(Organization organization) {
-        return repository.save(organization);
+        Organization saved = repository.save(organization);
+        publishChange(ActionEnum.UPDATED, saved.getOrganizationId());
+        return saved;
     }
 
     /**
-     * Elimina una organización. Lanza HTTP 404 si no existe previamente.
+     * Elimina una organización (404 si no existe) y publica un evento DELETED.
      */
     public void deleteOrganization(String organizationId) {
         Organization organization = getOrganization(organizationId);
         repository.delete(organization);
+        publishChange(ActionEnum.DELETED, organizationId);
+    }
+
+    /**
+     * Publica el evento de cambio en Kafka mediante StreamBridge.
+     * El correlationId va vacío por ahora; se poblará en la etapa de trazabilidad.
+     */
+    private void publishChange(ActionEnum action, String organizationId) {
+        OrganizationChangeModel event = new OrganizationChangeModel(action, organizationId, null);
+        streamBridge.send(OUTPUT_BINDING, event);
     }
 }
