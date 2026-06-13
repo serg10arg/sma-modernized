@@ -22,6 +22,10 @@ spring:
     init:
       # Ejecuta schema.sql y data.sql al arrancar
       mode: always
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
   security:
     oauth2:
       resourceserver:

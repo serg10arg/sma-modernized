@@ -114,6 +114,8 @@ services:
       - DB_USER=${DB_USER:-sma_user}
       - DB_PASSWORD=${DB_PASSWORD:-sma_password}
       - EUREKA_SERVER_URI=http://eureka-server:8761/eureka/
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
     depends_on:
       config-server:
         condition: service_healthy
@@ -124,6 +126,8 @@ services:
       keycloak:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - sma-network
@@ -218,6 +222,19 @@ services:
       interval: 10s
       timeout: 10s
       retries: 15
+
+  # --- Redis (caché distribuida para licensing-service) ---
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - sma-network
 
 networks:
   sma-network:
