@@ -123,6 +123,8 @@ services:
         condition: service_healthy
       keycloak:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
     networks:
       - sma-network
 
@@ -150,6 +152,8 @@ services:
         condition: service_healthy
       keycloak:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
     networks:
       - sma-network
 
@@ -175,9 +179,45 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 30s
+      start_period: 90s
     networks:
       - sma-network
+
+  # --- Kafka (broker de mensajería asíncrona, Etapa 8) ---
+  kafka:
+    image: apache/kafka:4.2.0
+    container_name: kafka
+    environment:
+      # --- Identidad y roles (KRaft: broker + controlador en un nodo) ---
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      # --- Listeners ---
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      # Anuncia kafka:9092 (nombre en la red Docker), NO localhost
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      # --- Single-node: todo con replicacion 1 ---
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # --- Dev: crea topics automaticamente al primer uso ---
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - sma-network
+    healthcheck:
+      # La imagen no trae curl; usamos la CLI de Kafka para confirmar que el broker responde
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      start_period: 30s
+      interval: 10s
+      timeout: 10s
+      retries: 15
 
 networks:
   sma-network:
@@ -185,3 +225,4 @@ networks:
 
 volumes:
   postgres-data:
+  kafka-data:
