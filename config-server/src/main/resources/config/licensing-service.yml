@@ -77,6 +77,12 @@ management:
     # La caché es no crítica por diseño: un Redis caído no debe poner el servicio en DOWN
     redis:
       enabled: false
+  tracing:
+    sampling:
+      probability: 1.0          # dev: trazar el 100% de las peticiones
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans
 
 # Nivel DEBUG del servicio: muestra los logs de cache-aside (HIT/MISS)
 logging:

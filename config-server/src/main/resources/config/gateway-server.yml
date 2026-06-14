@@ -44,3 +44,9 @@ management:
       # Deshabilitado por defecto desde el endurecimiento de SCG (CVE-2022-22947);
       # hay que habilitarlo explícitamente además de exponerlo.
       enabled: true
+  tracing:
+    sampling:
+      probability: 1.0          # dev: trazar el 100% de las peticiones
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans

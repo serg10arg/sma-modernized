@@ -1,6 +1,7 @@
 package com.sma.licensing.config;
 
 import com.sma.licensing.utils.UserContextInterceptor;
+import org.springframework.boot.autoconfigure.web.client.RestClientBuilderConfigurer;
 import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,11 +24,15 @@ public class RestClientConfig {
 
     /**
      * Builder balanceado: resuelve nombres lógicos de servicio a instancias reales.
+     * Se parte del builder autoconfigurado por Spring Boot (vía RestClientBuilderConfigurer)
+     * para conservar los customizers de observación; de lo contrario el RestClient no
+     * llevaría el ObservationRegistry y la llamada saliente no propagaría la traza
+     * (el span de organization-service quedaría desconectado en Zipkin).
      */
     @Bean
     @LoadBalanced
-    public RestClient.Builder loadBalancedRestClientBuilder() {
-        return RestClient.builder();
+    public RestClient.Builder loadBalancedRestClientBuilder(RestClientBuilderConfigurer configurer) {
+        return configurer.configure(RestClient.builder());
     }
 
     /**
