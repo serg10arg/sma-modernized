@@ -6,7 +6,7 @@ package com.sma.organization.event;
  *
  * @param action         tipo de cambio (CREATED, UPDATED, DELETED)
  * @param organizationId id de la organización afectada
- * @param correlationId  id de correlación; vacío por ahora (se poblará en la etapa de trazabilidad)
+ * @param correlationId  id de correlación; se rellena con el traceId de la traza en curso
  */
 public record OrganizationChangeModel(
         ActionEnum action,

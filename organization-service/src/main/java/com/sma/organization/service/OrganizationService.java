@@ -5,6 +5,7 @@ import com.sma.organization.event.OrganizationChangeModel;
 import com.sma.organization.exception.OrganizationNotFoundException;
 import com.sma.organization.model.Organization;
 import com.sma.organization.repository.OrganizationRepository;
+import io.micrometer.tracing.Tracer;
 import org.springframework.cloud.stream.function.StreamBridge;
 import org.springframework.stereotype.Service;
 
@@ -24,10 +25,12 @@ public class OrganizationService {
 
     private final OrganizationRepository repository;
     private final StreamBridge streamBridge;
+    private final Tracer tracer;
 
-    public OrganizationService(OrganizationRepository repository, StreamBridge streamBridge) {
+    public OrganizationService(OrganizationRepository repository, StreamBridge streamBridge, Tracer tracer) {
         this.repository = repository;
         this.streamBridge = streamBridge;
+        this.tracer = tracer;
     }
 
     /**
@@ -76,10 +79,19 @@ public class OrganizationService {
 
     /**
      * Publica el evento de cambio en Kafka mediante StreamBridge.
-     * El correlationId va vacío por ahora; se poblará en la etapa de trazabilidad.
+     * El correlationId se rellena con el traceId de la traza en curso.
      */
     private void publishChange(ActionEnum action, String organizationId) {
-        OrganizationChangeModel event = new OrganizationChangeModel(action, organizationId, null);
+        OrganizationChangeModel event = new OrganizationChangeModel(action, organizationId, currentTraceId());
         streamBridge.send(OUTPUT_BINDING, event);
+    }
+
+    /**
+     * Devuelve el traceId de la traza en curso, que usamos como identificador de
+     * correlación del evento. Si no hay span activo, devuelve null.
+     */
+    private String currentTraceId() {
+        var span = tracer.currentSpan();
+        return (span != null) ? span.context().traceId() : null;
     }
 }

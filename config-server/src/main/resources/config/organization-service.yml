@@ -29,6 +29,7 @@ spring:
       kafka:
         binder:
           brokers: kafka:9092
+          enable-observation: true   # propaga el contexto de traza por los mensajes Kafka
       bindings:
         # Binding de salida usado por StreamBridge para publicar el evento
         organizationChange-out-0:
