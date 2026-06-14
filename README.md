@@ -26,7 +26,7 @@ asíncrona y caché distribuida.
 | Spring Data Redis / Redis | 7 | Caché distribuida |
 | Spring Security + OAuth2 | 6 | Seguridad de los servicios |
 | Keycloak | — | Servidor de identidad (OAuth2/JWT) |
-| Micrometer Tracing + Zipkin | — | Trazabilidad distribuida (en preparación, Etapa 9) |
+| Micrometer Tracing (Brave) + Zipkin | — | Trazabilidad distribuida (HTTP y Kafka) |
 | PostgreSQL | — | Persistencia relacional |
 | Maven | — | Construcción (monorepo multi-módulo) |
 | Docker + Docker Compose | — | Orquestación local |
@@ -40,7 +40,10 @@ Los clientes acceden al sistema exclusivamente a través del `gateway-server`
 Los servicios obtienen su configuración del `config-server`, validan los tokens
 JWT emitidos por Keycloak, se comunican de forma síncrona (REST con balanceo por
 descubrimiento) y asíncrona (eventos en Kafka), y emplean Redis como caché
-distribuida.
+distribuida. Toda petición se traza de extremo a extremo (HTTP y Kafka) con
+Micrometer Tracing, exportando los spans a Zipkin; el mismo identificador de traza
+viaja como `tmx-correlation-id` en la respuesta y como `correlationId` en los
+eventos, dando un único valor de correlación en todo el sistema.
 
 ## Servicios
 
@@ -113,5 +116,5 @@ El archivo `.env` en la raíz controla la configuración del sistema. Cópialo d
 | Etapa 6 | `gateway-server`: rutas, pre-filter y post-filter | ✅ Completada |
 | Etapa 7 | Seguridad OAuth2 + JWT con Keycloak | ✅ Completada |
 | Etapa 8 | Mensajería asíncrona con Kafka + caché con Redis | ✅ Completada |
-| Etapa 9 | Trazabilidad distribuida con Micrometer + Zipkin | 🔜 Pendiente |
+| Etapa 9 | Trazabilidad distribuida con Micrometer + Zipkin | ✅ Completada |
 | Posteriores | Observabilidad (ELK, Prometheus/Grafana) y despliegue en cloud | ⏸️ Fuera del alcance actual |

@@ -22,6 +22,7 @@ Introducido en la **Etapa 2** (esqueleto REST). Ampliado en etapas posteriores:
   público).
 - **Etapa 7:** seguridad OAuth2 + JWT como *resource server*.
 - **Etapa 8:** consumidor de eventos Kafka y caché distribuida con Redis.
+- **Etapa 9:** trazabilidad distribuida con Micrometer Tracing + Zipkin.
 
 ## Responsabilidades
 
@@ -38,6 +39,9 @@ Introducido en la **Etapa 2** (esqueleto REST). Ampliado en etapas posteriores:
 - Internacionalizar los mensajes según el header `Accept-Language` y añadir links
   HATEOAS a las respuestas.
 - Validar el token JWT y autorizar por rol como *resource server* OAuth2.
+- Participar en la traza distribuida: cada petición e invocación (HTTP y consumo
+  de eventos Kafka) genera spans que se exportan a Zipkin; el span del consumidor
+  se enlaza con el del productor a través de las cabeceras del mensaje.
 
 ## Tecnologías
 
@@ -50,6 +54,7 @@ Introducido en la **Etapa 2** (esqueleto REST). Ampliado en etapas posteriores:
 - Spring Cloud Stream + binder de Kafka (consumidor)
 - Spring Data Redis (cliente Lettuce) para la caché
 - Spring Security 6 + OAuth2 Resource Server (JWT)
+- Micrometer Tracing (bridge Brave) + Zipkin reporter
 - `MessageSource` para internacionalización
 
 ## Configuración
@@ -66,6 +71,9 @@ Propiedades relevantes:
 | `spring.cloud.stream.bindings.organizationChange-in-0` | Binding de entrada al topic `sma.organization.changes`, grupo `licensing-group` |
 | `resilience4j.*` | Instancias `organizationService` (circuit breaker), `retryLicenseService`, bulkhead y rate limiter |
 | `spring.security.oauth2.resourceserver.jwt.issuer-uri` | `http://keycloak:8080/realms/sma` |
+| `management.tracing.sampling.probability` | `1.0` en dev (trazar el 100% de las peticiones) |
+| `management.zipkin.tracing.endpoint` | `http://zipkin:9411/api/v2/spans` |
+| `spring.cloud.stream.kafka.binder.enable-observation` | `true` — propaga el contexto de traza por los mensajes Kafka |
 | `management.health.redis.enabled` | `false` — la caché es no crítica: un Redis caído no degrada la salud del servicio |
 
 Las variables de entorno (`DB_*`, `REDIS_HOST`, `REDIS_PORT`, etc.) se definen en
@@ -143,4 +151,5 @@ Response (`200 OK`):
 - Redis — caché distribuida de organizaciones.
 - Kafka — eventos de cambio de organización (topic `sma.organization.changes`).
 - Keycloak — validación del token JWT.
+- Zipkin — recepción de los spans de traza.
 - `gateway-server` — entrada única al sistema.

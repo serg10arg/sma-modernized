@@ -14,6 +14,7 @@ Introducido en la **Etapa 4**. Ampliado en etapas posteriores:
 
 - **Etapa 7:** seguridad OAuth2 + JWT como *resource server*.
 - **Etapa 8:** productor de eventos de cambio de organización en Kafka.
+- **Etapa 9:** trazabilidad distribuida con Micrometer Tracing + Zipkin.
 
 ## Responsabilidades
 
@@ -21,8 +22,12 @@ Introducido en la **Etapa 4**. Ampliado en etapas posteriores:
 - Persistir las organizaciones en la base `sma_organization` (PostgreSQL).
 - Registrarse en Eureka para ser descubierto por otros servicios.
 - Publicar un evento `OrganizationChangeModel` (`CREATED` / `UPDATED` / `DELETED`)
-  en Kafka tras cada mutación, mediante `StreamBridge`.
+  en Kafka tras cada mutación, mediante `StreamBridge`, con el `correlationId`
+  poblado a partir del identificador de traza (traceId) en curso.
 - Validar el token JWT y autorizar por rol como *resource server* OAuth2.
+- Participar en la traza distribuida: las peticiones HTTP y la publicación de
+  eventos generan spans que se exportan a Zipkin, propagando el contexto de traza
+  al consumidor a través de las cabeceras del mensaje Kafka.
 
 ## Tecnologías
 
@@ -31,6 +36,7 @@ Introducido en la **Etapa 4**. Ampliado en etapas posteriores:
 - Spring Cloud Config Client (`spring.config.import`) y Eureka Client
 - Spring Cloud Stream + binder de Kafka (productor, vía `StreamBridge`)
 - Spring Security 6 + OAuth2 Resource Server (JWT)
+- Micrometer Tracing (bridge Brave) + Zipkin reporter
 
 ## Configuración
 
@@ -43,6 +49,9 @@ Propiedades relevantes:
 | `eureka.client.*` | Registro en el `eureka-server` |
 | `spring.cloud.stream.bindings.organizationChange-out-0` | Binding de salida hacia el topic `sma.organization.changes` |
 | `spring.cloud.stream.kafka.binder.brokers` | `kafka:9092` |
+| `spring.cloud.stream.kafka.binder.enable-observation` | `true` — propaga el contexto de traza por los mensajes Kafka |
+| `management.tracing.sampling.probability` | `1.0` en dev |
+| `management.zipkin.tracing.endpoint` | `http://zipkin:9411/api/v2/spans` |
 | `spring.security.oauth2.resourceserver.jwt.issuer-uri` | `http://keycloak:8080/realms/sma` |
 
 ## Ejecución local
@@ -109,10 +118,11 @@ evento con `action = CREATED` y el `organizationId` correspondiente.
 - PostgreSQL — base de datos `sma_organization`.
 - Kafka — publicación de eventos de cambio (topic `sma.organization.changes`).
 - Keycloak — validación del token JWT.
+- Zipkin — recepción de los spans de traza.
 - `gateway-server` — entrada única al sistema.
 
 ## Limitaciones conocidas
 
-- Los eventos publicados llevan el `correlationId` a `null`: este servicio aún no
-  lee ni reemite el header `tmx-correlation-id`. Se resolverá en la etapa de
-  trazabilidad distribuida (Etapa 9).
+- La ruta de colección con barra final (`/organization/`) tiene una limitación
+  conocida en el gateway; para crear y listar se usa la ruta de descubrimiento
+  `/organization-service/v1/organization` (ver sección API).
