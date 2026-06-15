@@ -54,6 +54,12 @@
             <artifactId>zipkin-reporter-brave</artifactId>
         </dependency>
 
+        <!-- Encoder de logs JSON (formato ECS) para la agregación con ELK (Etapa 10) -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>

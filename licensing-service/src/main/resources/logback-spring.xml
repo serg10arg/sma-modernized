@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Valores por defecto de Spring Boot (niveles, conversores) -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <!-- Nombre del servicio para el campo ECS service.name -->
+    <springProperty scope="context" name="appName"
+                    source="spring.application.name" defaultValue="unknown"/>
+
+    <!-- Appender JSON en formato ECS para entorno contenedorizado -->
+    <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp>
+                    <fieldName>@timestamp</fieldName>
+                    <timeZone>UTC</timeZone>
+                </timestamp>
+                <logLevel>
+                    <fieldName>log.level</fieldName>
+                </logLevel>
+                <message>
+                    <fieldName>message</fieldName>
+                </message>
+                <loggerName>
+                    <fieldName>log.logger</fieldName>
+                </loggerName>
+                <threadName>
+                    <fieldName>process.thread.name</fieldName>
+                </threadName>
+                <stackTrace>
+                    <fieldName>error.stack_trace</fieldName>
+                </stackTrace>
+                <!-- Campos ECS con clave anidada por punto; tomados del MDC -->
+                <pattern>
+                    <omitEmptyFields>true</omitEmptyFields>
+                    <pattern>
+                        {
+                          "service.name": "${appName}",
+                          "trace.id": "%mdc{traceId:-}",
+                          "span.id": "%mdc{spanId:-}"
+                        }
+                    </pattern>
+                </pattern>
+            </providers>
+        </encoder>
+    </appender>
+
+    <!-- Perfil por defecto/contenedor: salida JSON -->
+    <springProfile name="!local">
+        <root level="INFO">
+            <appender-ref ref="JSON_CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <!-- Perfil local: consola legible de Spring Boot (para mvn spring-boot:run) -->
+    <springProfile name="local">
+        <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+</configuration>
