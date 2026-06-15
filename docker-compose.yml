@@ -237,9 +237,12 @@ services:
       - sma-network
 
   # --- Elasticsearch (almacenamiento de logs, Etapa 10) ---
+  # Perfil "logging": no se levanta en el día a día; solo bajo demanda con
+  # `docker compose --profile logging up -d`, para ahorrar RAM de la pila.
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:9.4.2
     container_name: elasticsearch
+    profiles: ["logging"]
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
@@ -264,11 +267,14 @@ services:
       start_period: 60s
 
   # --- Kibana (visualización de logs, Etapa 10) ---
+  # Perfil "logging": arranca solo bajo demanda con el resto del stack ELK.
   kibana:
     image: docker.elastic.co/kibana/kibana:9.4.2
     container_name: kibana
+    profiles: ["logging"]
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - NODE_OPTIONS=--max-old-space-size=512
     ports:
       - "5601:5601"
     depends_on:
